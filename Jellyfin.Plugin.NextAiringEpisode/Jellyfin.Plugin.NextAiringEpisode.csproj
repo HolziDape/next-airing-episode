@@ -1,0 +1,26 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net8.0</TargetFramework>
+    <AssemblyName>Jellyfin.Plugin.NextAiringEpisode</AssemblyName>
+    <RootNamespace>Jellyfin.Plugin.NextAiringEpisode</RootNamespace>
+    <GenerateAssemblyInfo>false</GenerateAssemblyInfo>
+    <Nullable>enable</Nullable>
+    <AnalysisMode>AllEnabledByDefault</AnalysisMode>
+    <TreatWarningsAsErrors>false</TreatWarningsAsErrors>
+    <Version>1.0.0.0</Version>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Jellyfin.Model" Version="10.10.7" />
+    <PackageReference Include="Jellyfin.Controller" Version="10.10.7" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- Embed the JS file as a resource -->
+    <EmbeddedResource Include="..\src\next-episode.js">
+      <LogicalName>next-episode.js</LogicalName>
+    </EmbeddedResource>
+  </ItemGroup>
+
+</Project>
