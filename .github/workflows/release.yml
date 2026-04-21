@@ -3,8 +3,11 @@ name: Build & Release
 on:
   push:
     tags:
-      - 'v*.*.*'   # Trigger on version tags like v1.0.0
+      - 'v*.*.*'
   workflow_dispatch:
+
+permissions:
+  contents: write
 
 jobs:
   build:
@@ -57,8 +60,6 @@ jobs:
             https://raw.githubusercontent.com/HolziDape/next-airing-episode/main/manifest.json
             ```
             Then install **Next Airing Episode** from the plugin catalog.
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Commit updated manifest
         run: |
@@ -67,5 +68,3 @@ jobs:
           git add manifest.json
           git diff --staged --quiet || git commit -m "chore: update manifest checksum for ${{ github.ref_name }}"
           git push origin HEAD:main
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
