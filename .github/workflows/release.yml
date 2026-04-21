@@ -1,0 +1,71 @@
+name: Build & Release
+
+on:
+  push:
+    tags:
+      - 'v*.*.*'   # Trigger on version tags like v1.0.0
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '8.0.x'
+
+      - name: Restore dependencies
+        run: dotnet restore Jellyfin.Plugin.NextAiringEpisode/Jellyfin.Plugin.NextAiringEpisode.csproj
+
+      - name: Build
+        run: |
+          dotnet build Jellyfin.Plugin.NextAiringEpisode/Jellyfin.Plugin.NextAiringEpisode.csproj \
+            --configuration Release \
+            --no-restore \
+            -o ./build
+
+      - name: Package plugin ZIP
+        run: |
+          VERSION=${GITHUB_REF_NAME#v}
+          mkdir -p ./dist
+          zip -j ./dist/Jellyfin.Plugin.NextAiringEpisode_${VERSION}.0.zip \
+            ./build/Jellyfin.Plugin.NextAiringEpisode.dll
+
+      - name: Update manifest checksum
+        run: |
+          VERSION=${GITHUB_REF_NAME#v}
+          ZIPFILE="./dist/Jellyfin.Plugin.NextAiringEpisode_${VERSION}.0.zip"
+          CHECKSUM=$(md5sum "$ZIPFILE" | awk '{print $1}')
+          sed -i "s/\"checksum\": \"\"/\"checksum\": \"${CHECKSUM}\"/" manifest.json
+          echo "Checksum: $CHECKSUM"
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: ./dist/*.zip
+          body: |
+            ## Next Airing Episode ${{ github.ref_name }}
+
+            ### Installation
+            Add this repository URL to Jellyfin:
+            ```
+            https://raw.githubusercontent.com/HolziDape/next-airing-episode/main/manifest.json
+            ```
+            Then install **Next Airing Episode** from the plugin catalog.
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Commit updated manifest
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add manifest.json
+          git diff --staged --quiet || git commit -m "chore: update manifest checksum for ${{ github.ref_name }}"
+          git push origin HEAD:main
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
