@@ -12,19 +12,21 @@ namespace Jellyfin.Plugin.NextAiringEpisode
 {
     /// <summary>
     /// Next Airing Episode plugin for Jellyfin.
-    /// Injects a JavaScript badge into the web UI that shows
-    /// when the next unaired episode of a series will air.
     /// </summary>
-    public class Plugin : BasePlugin<PluginConfiguration>, IHasWebPages
+    public class NextAiringEpisodePlugin : BasePlugin<PluginConfiguration>, IHasWebPages
     {
-        private readonly ILogger<Plugin> _logger;
+        private readonly ILogger<NextAiringEpisodePlugin> _logger;
 
-        public Plugin(
+        /// <summary>
+        /// Initializes a new instance of the <see cref="NextAiringEpisodePlugin"/> class.
+        /// </summary>
+        public NextAiringEpisodePlugin(
             IApplicationPaths applicationPaths,
             IXmlSerializer xmlSerializer,
-            ILogger<Plugin> logger)
+            ILogger<NextAiringEpisodePlugin> logger)
             : base(applicationPaths, xmlSerializer)
         {
+            ArgumentNullException.ThrowIfNull(applicationPaths);
             _logger = logger;
             Instance = this;
             InjectScript(applicationPaths);
@@ -41,87 +43,81 @@ namespace Jellyfin.Plugin.NextAiringEpisode
             "Shows when the next unaired episode of a series will air, directly on the series detail page.";
 
         /// <summary>Gets the global plugin instance.</summary>
-        public static Plugin? Instance { get; private set; }
+        public static NextAiringEpisodePlugin? Instance { get; private set; }
 
         /// <inheritdoc />
         public IEnumerable<PluginPageInfo> GetPages()
         {
-            return new[]
-            {
-                new PluginPageInfo
-                {
-                    Name        = "NextAiringEpisode",
-                    EmbeddedResourcePath = $"{GetType().Namespace}.Configuration.configPage.html"
-                }
-            };
+            return Array.Empty<PluginPageInfo>();
         }
-
-        // ── Script injection ────────────────────────────────────────────────
 
         private void InjectScript(IApplicationPaths paths)
         {
             try
             {
-                // Read JS from embedded resource
-                var assembly   = Assembly.GetExecutingAssembly();
+                var assembly = Assembly.GetExecutingAssembly();
                 using var stream = assembly.GetManifestResourceStream("next-episode.js");
                 if (stream is null)
                 {
-                    _logger.LogWarning("[Next Airing Episode] Embedded JS resource not found.");
+                    _logger.LogWarning("[Next Airing Episode] Embedded JS resource not found");
                     return;
                 }
 
                 using var reader = new StreamReader(stream);
                 var jsContent = reader.ReadToEnd();
 
-                // Find Jellyfin's web root index.html
-                var webRoot  = Path.Combine(paths.ProgramDataPath, "..", "jellyfin-web");
-                var indexPath = Path.Combine(webRoot, "index.html");
-
-                if (!File.Exists(indexPath))
-                {
-                    // Try common alternative paths
-                    var alt = new[]
-                    {
-                        "/usr/share/jellyfin/web/index.html",
-                        "/usr/lib/jellyfin/bin/jellyfin-web/index.html",
-                    };
-                    indexPath = Array.Find(alt, File.Exists) ?? string.Empty;
-                }
-
+                var indexPath = FindIndexHtml(paths);
                 if (string.IsNullOrEmpty(indexPath))
                 {
                     _logger.LogWarning(
                         "[Next Airing Episode] index.html not found. " +
-                        "If using Docker, map index.html as a volume (see README).");
+                        "If using Docker, map index.html as a volume (see README)");
                     return;
                 }
 
                 var html = File.ReadAllText(indexPath);
-                const string marker = "<!-- next-airing-episode -->";
+                const string Marker = "<!-- next-airing-episode -->";
 
-                if (html.Contains(marker))
+                if (html.Contains(Marker, StringComparison.Ordinal))
                 {
-                    _logger.LogInformation("[Next Airing Episode] Already injected, skipping.");
+                    _logger.LogInformation("[Next Airing Episode] Already injected, skipping");
                     return;
                 }
 
-                var tag = $"\n{marker}\n<script>\n{jsContent}\n</script>\n</body>";
+                var tag = $"\n{Marker}\n<script>\n{jsContent}\n</script>\n</body>";
                 html = html.Replace("</body>", tag, StringComparison.OrdinalIgnoreCase);
                 File.WriteAllText(indexPath, html);
 
-                _logger.LogInformation("[Next Airing Episode] Script injected into {Path}.", indexPath);
+                _logger.LogInformation("[Next Airing Episode] Script injected into {Path}", indexPath);
             }
-            catch (UnauthorizedAccessException)
+            catch (UnauthorizedAccessException ex)
             {
-                _logger.LogError(
-                    "[Next Airing Episode] Permission denied writing to index.html. " +
-                    "See README for Docker volume mapping instructions.");
+                _logger.LogError(ex, "[Next Airing Episode] Permission denied writing to index.html. See README for Docker volume mapping");
             }
-            catch (Exception ex)
+            catch (IOException ex)
             {
-                _logger.LogError(ex, "[Next Airing Episode] Failed to inject script.");
+                _logger.LogError(ex, "[Next Airing Episode] IO error while injecting script");
             }
+        }
+
+        private static string FindIndexHtml(IApplicationPaths paths)
+        {
+            var candidates = new[]
+            {
+                Path.Combine(paths.ProgramDataPath, "..", "jellyfin-web", "index.html"),
+                "/usr/share/jellyfin/web/index.html",
+                "/usr/lib/jellyfin/bin/jellyfin-web/index.html",
+            };
+
+            foreach (var path in candidates)
+            {
+                if (File.Exists(path))
+                {
+                    return path;
+                }
+            }
+
+            return string.Empty;
         }
     }
 }
