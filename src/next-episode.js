@@ -1,10 +1,10 @@
 /**
- * Next Airing Episode – Jellyfin Plugin
- * =======================================
+ * Next Airing Episode - Jellyfin Plugin
+ * =====================================
  * Shows when the next unaired episode of a series will air,
  * directly on the series detail page in Jellyfin.
  *
- * @version     1.0.0
+ * @version     1.0.3
  * @author      HolziDape
  * @license     MIT
  * @repository  https://github.com/HolziDape/next-airing-episode
@@ -13,10 +13,15 @@
 (function () {
   'use strict';
 
-  const BADGE_ID   = 'next-airing-episode-badge';
+  const VERSION = '1.0.3';
+  const BADGE_ID = 'next-airing-episode-badge';
   const SCRIPT_TAG = '[Next Airing Episode]';
+  const LOCALE = 'de-DE';
+  let currentRun = 0;
 
-  // ── Auth helpers ────────────────────────────────────────────────────────────
+  function getApiClient() {
+    return typeof window.ApiClient === 'object' && window.ApiClient ? window.ApiClient : null;
+  }
 
   function getCredentials() {
     try {
@@ -28,18 +33,47 @@
     }
   }
 
-  function getToken()  { return (getCredentials() || {}).AccessToken || null; }
-  function getUserId() { return (getCredentials() || {}).UserId      || null; }
+  function getToken() {
+    const apiClient = getApiClient();
+    if (apiClient && typeof apiClient.accessToken === 'function') {
+      return apiClient.accessToken();
+    }
 
-  // ── API ─────────────────────────────────────────────────────────────────────
+    return (getCredentials() || {}).AccessToken || null;
+  }
+
+  function getUserId() {
+    const apiClient = getApiClient();
+    if (apiClient && typeof apiClient.getCurrentUserId === 'function') {
+      return apiClient.getCurrentUserId();
+    }
+
+    return (getCredentials() || {}).UserId || null;
+  }
+
+  function getServerAddress() {
+    const apiClient = getApiClient();
+    if (apiClient && typeof apiClient.serverAddress === 'function') {
+      return apiClient.serverAddress();
+    }
+
+    return (getCredentials() || {}).ManualAddress || location.origin;
+  }
 
   async function apiFetch(path) {
     const token = getToken();
-    if (!token) return null;
+    const serverAddress = getServerAddress();
+    if (!token || !serverAddress) {
+      return null;
+    }
+
     try {
-      const res = await fetch(`${location.origin}${path}`, {
-        headers: { 'X-Emby-Token': token }
+      const res = await fetch(`${serverAddress}${path}`, {
+        headers: {
+          'X-Emby-Token': token,
+        },
       });
+
       return res.ok ? res.json() : null;
     } catch {
       return null;
@@ -48,82 +82,113 @@
 
   async function getItemType(itemId) {
     const userId = getUserId();
-    if (!userId || !itemId) return null;
-    const data = await apiFetch(`/Users/${userId}/Items/${itemId}`);
+    if (!userId || !itemId) {
+      return null;
+    }
+
+    const data = await apiFetch(`/Users/${encodeURIComponent(userId)}/Items/${encodeURIComponent(itemId)}`);
     return data ? data.Type : null;
   }
 
   async function fetchNextUnaired(seriesId) {
     const userId = getUserId();
-    if (!userId) return null;
+    if (!userId) {
+      return null;
+    }
 
     const data = await apiFetch(
-      `/Users/${userId}/Items?` +
-      `ParentId=${seriesId}` +
-      `&IncludeItemTypes=Episode` +
-      `&Recursive=true` +
-      `&Fields=PremiereDate,IndexNumber,ParentIndexNumber` +
-      `&SortBy=PremiereDate` +
-      `&SortOrder=Ascending` +
-      `&Limit=500`
+      `/Users/${encodeURIComponent(userId)}/Items?` +
+      `ParentId=${encodeURIComponent(seriesId)}` +
+      '&IncludeItemTypes=Episode' +
+      '&Recursive=true' +
+      '&Fields=PremiereDate,IndexNumber,ParentIndexNumber' +
+      '&SortBy=PremiereDate' +
+      '&SortOrder=Ascending' +
+      '&Limit=500'
     );
 
-    if (!data?.Items) return null;
+    if (!data || !Array.isArray(data.Items)) {
+      return null;
+    }
 
     const now = new Date();
-    return data.Items.find(ep => ep.PremiereDate && new Date(ep.PremiereDate) > now) || null;
+    return data.Items.find((ep) => ep.PremiereDate && new Date(ep.PremiereDate) > now) || null;
   }
-
-  // ── Date formatting ─────────────────────────────────────────────────────────
 
   function formatRelative(dateStr) {
-    const d    = new Date(dateStr);
-    const now  = new Date();
-    const diff = Math.ceil((d - now) / 864e5);
+    const date = new Date(dateStr);
+    const now = new Date();
+    const diff = Math.ceil((date - now) / 864e5);
 
-    const abs = d.toLocaleDateString('de-DE', {
-      weekday: 'long', day: 'numeric', month: 'long', year: 'numeric'
+    const absoluteDate = date.toLocaleDateString(LOCALE, {
+      weekday: 'long',
+      day: 'numeric',
+      month: 'long',
+      year: 'numeric',
     });
 
-    if (diff === 0) return `Heute  ·  ${abs}`;
-    if (diff === 1) return `Morgen  ·  ${abs}`;
-    if (diff >  1 && diff <= 7) return `In ${diff} Tagen  ·  ${abs}`;
-    return abs;
-  }
+    if (diff === 0) {
+      return `Heute - ${absoluteDate}`;
+    }
 
-  // ── DOM helpers ─────────────────────────────────────────────────────────────
+    if (diff === 1) {
+      return `Morgen - ${absoluteDate}`;
+    }
+
+    if (diff > 1 && diff <= 7) {
+      return `In ${diff} Tagen - ${absoluteDate}`;
+    }
+
+    return absoluteDate;
+  }
 
   function removeBadge() {
     document.getElementById(BADGE_ID)?.remove();
   }
 
+  function createLine(text, style) {
+    const line = document.createElement('div');
+    line.textContent = text;
+    line.style.cssText = style;
+    return line;
+  }
+
   function injectBadge(episode) {
     removeBadge();
 
-    const s  = String(episode.ParentIndexNumber || 0).padStart(2, '0');
-    const e  = String(episode.IndexNumber       || 0).padStart(2, '0');
-    const ep = episode.Name ? `S${s}E${e} – ${episode.Name}` : `S${s}E${e}`;
-    const dt = formatRelative(episode.PremiereDate);
+    const season = String(episode.ParentIndexNumber || 0).padStart(2, '0');
+    const episodeNumber = String(episode.IndexNumber || 0).padStart(2, '0');
+    const episodeLabel = episode.Name ? `S${season}E${episodeNumber} - ${episode.Name}` : `S${season}E${episodeNumber}`;
+    const dateLabel = formatRelative(episode.PremiereDate);
 
     const badge = document.createElement('div');
     badge.id = BADGE_ID;
     badge.style.cssText = [
-      'display:inline-flex', 'align-items:center', 'gap:10px',
-      'margin-top:14px', 'padding:9px 15px',
+      'display:inline-flex',
+      'align-items:center',
+      'gap:10px',
+      'margin-top:14px',
+      'padding:9px 15px',
       'background:rgba(0,164,220,.12)',
       'border:1px solid rgba(0,164,220,.45)',
-      'border-radius:10px', 'font-size:.9em',
-      'color:#e0e0e0', 'max-width:520px',
+      'border-radius:10px',
+      'font-size:.9em',
+      'color:#e0e0e0',
+      'max-width:520px',
       'box-shadow:0 2px 8px rgba(0,0,0,.25)',
     ].join(';');
 
-    badge.innerHTML = `
-      <span style="font-size:1.4em;line-height:1">📅</span>
-      <div>
-        <div style="font-weight:700;color:#00a4dc;letter-spacing:.02em">Next Airing Episode</div>
-        <div style="margin-top:2px;font-size:.9em;opacity:.9">${ep}</div>
-        <div style="margin-top:3px;font-size:.82em;opacity:.65">${dt}</div>
-      </div>`;
+    const icon = document.createElement('span');
+    icon.innerHTML = '&#128197;';
+    icon.style.cssText = 'font-size:1.4em;line-height:1';
+
+    const content = document.createElement('div');
+    content.appendChild(createLine('Next Airing Episode', 'font-weight:700;color:#00a4dc;letter-spacing:.02em'));
+    content.appendChild(createLine(episodeLabel, 'margin-top:2px;font-size:.9em;opacity:.9'));
+    content.appendChild(createLine(dateLabel, 'margin-top:3px;font-size:.82em;opacity:.65'));
+
+    badge.appendChild(icon);
+    badge.appendChild(content);
 
     const anchors = [
       '.itemGenres',
@@ -133,45 +198,103 @@
       '.nameContainer',
     ];
 
-    for (const sel of anchors) {
-      const el = document.querySelector(sel);
-      if (el) { el.insertAdjacentElement('afterend', badge); return; }
+    for (const selector of anchors) {
+      const element = document.querySelector(selector);
+      if (element) {
+        element.insertAdjacentElement('afterend', badge);
+        return;
+      }
     }
 
-    (document.querySelector('.detailPageContent') || document.querySelector('main'))
-      ?.prepend(badge);
+    (document.querySelector('.detailPageContent') || document.querySelector('main'))?.prepend(badge);
   }
 
-  // ── Page detection ──────────────────────────────────────────────────────────
-
   function getItemIdFromUrl() {
-    return (location.href.match(/[?&]id=([a-f0-9]+)/i) || [])[1] || null;
+    try {
+      const url = new URL(location.href);
+      return url.searchParams.get('id');
+    } catch {
+      return null;
+    }
   }
 
   async function checkPage() {
+    const runId = ++currentRun;
     const itemId = getItemIdFromUrl();
-    if (!itemId) { removeBadge(); return; }
+    if (!itemId) {
+      removeBadge();
+      return;
+    }
 
-    await new Promise(r => setTimeout(r, 900));
+    await new Promise((resolve) => setTimeout(resolve, 900));
+    if (runId !== currentRun) {
+      return;
+    }
 
     const type = await getItemType(itemId);
-    if (type !== 'Series') { removeBadge(); return; }
+    if (runId !== currentRun) {
+      return;
+    }
 
-    const next = await fetchNextUnaired(itemId);
-    next ? injectBadge(next) : removeBadge();
+    if (type !== 'Series') {
+      removeBadge();
+      return;
+    }
+
+    const nextEpisode = await fetchNextUnaired(itemId);
+    if (runId !== currentRun) {
+      return;
+    }
+
+    if (nextEpisode) {
+      injectBadge(nextEpisode);
+    } else {
+      removeBadge();
+    }
   }
 
-  // ── SPA navigation observer ─────────────────────────────────────────────────
+  function queueCheck() {
+    window.setTimeout(checkPage, 0);
+  }
 
-  let lastUrl = location.href;
+  function installNavigationHooks() {
+    let lastUrl = location.href;
+    const handleNavigation = () => {
+      if (location.href !== lastUrl) {
+        lastUrl = location.href;
+        queueCheck();
+      }
+    };
 
-  new MutationObserver(() => {
-    if (location.href !== lastUrl) {
-      lastUrl = location.href;
-      checkPage();
-    }
-  }).observe(document.body, { childList: true, subtree: true });
+    const observer = new MutationObserver(handleNavigation);
 
-  checkPage();
-  console.info(`${SCRIPT_TAG} v1.0.0 loaded ✓`);
+    const startObserver = () => {
+      if (!document.body) {
+        window.setTimeout(startObserver, 100);
+        return;
+      }
+
+      observer.observe(document.body, { childList: true, subtree: true });
+    };
+
+    const originalPushState = history.pushState;
+    history.pushState = function pushState() {
+      originalPushState.apply(this, arguments);
+      handleNavigation();
+    };
+
+    const originalReplaceState = history.replaceState;
+    history.replaceState = function replaceState() {
+      originalReplaceState.apply(this, arguments);
+      handleNavigation();
+    };
+
+    window.addEventListener('popstate', handleNavigation);
+    window.addEventListener('hashchange', handleNavigation);
+    startObserver();
+  }
+
+  installNavigationHooks();
+  queueCheck();
+  console.info(`${SCRIPT_TAG} v${VERSION} loaded`);
 })();
