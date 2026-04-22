@@ -79,8 +79,8 @@ README.md
 
 ## Current version
 
-- plugin assembly version: `1.0.6.0`
-- web script version: `1.0.6`
+- plugin assembly version: `1.0.7.0`
+- web script version: `1.0.7`
 
 ## Development notes
 

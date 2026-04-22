@@ -166,6 +166,176 @@ Das Plugin arbeitet weiterhin ueber HTML-Injektion. Das ist praktisch, aber bei 
 
 Der neue Wunsch war, dass auf einer Episodenseite unter der aktuellen bzw. letzten sichtbaren Folge weitere kommende Folgen erscheinen. Dafuer wurde die Client-Logik erweitert, damit Jellyfin auf Episodenseiten mehrere kuenftige Episoden als Vorschau anzeigt statt nur eines einzelnen Badges auf Serienseiten.
 
+## Aktueller Stand nach Sichtung der Screenshots
+
+Nach dem Test mit den Screenshots wurde klar:
+
+- der gewuenschte Zielbereich ist nicht nur eine reine Episodenseite
+- der relevante Screen ist die normale Serienansicht mit vorhandener Episodenliste
+- gewuenscht ist, dass die Anzeige optisch direkt unter der vorhandenen Liste weiterlaeuft
+- idealerweise soll es wirken wie weitere Jellyfin-Episodenkarten
+- zusaetzlich sollen Bild und Releasedatum sichtbar sein
+
+## Was bereits umgesetzt wurde
+
+### Version 1.0.5
+
+Es wurde eine neue UI fuer kommende Folgen eingefuehrt:
+
+- Karten mit Bild, Titel, Episodenkennung, Releasedatum und Kurzbeschreibung
+- Anzeige auf Episodenseiten
+- separate Sektion `Kommende Folgen`
+
+### Version 1.0.6
+
+Nach dem naechsten Screenshot wurde klar, dass die bisherige Logik auf der falschen Seite greift. Deshalb wurde nachgebessert:
+
+- dieselbe Kartenlogik wird jetzt auch auf Serienseiten aufgerufen
+- die Vorschau soll unterhalb des Episodenbereichs erscheinen
+- daraus wurde Release `1.0.6.0`
+
+## Warum das Ergebnis noch nicht dem Wunsch entspricht
+
+Der entscheidende Unterschied ist:
+
+- bisher wurde eine eigene Zusatzsektion erzeugt
+- gewuenscht ist aber keine separate Sektion
+- gewuenscht ist eine Fortsetzung der vorhandenen Jellyfin-Episodenliste selbst
+
+Das heisst technisch:
+
+- aktuell wird neuer Inhalt neben oder unter den vorhandenen Jellyfin-Bloecken eingefuegt
+- du willst stattdessen, dass die bestehenden Episodenelemente visuell und strukturell weitergefuehrt werden
+- also zum Beispiel direkt nach Folge 4 weitere Eintraege fuer kommende Folgen
+
+## Wichtige Klarstellung
+
+Ich habe den Screenshot bisher nicht pixelgenau nachgebaut.
+
+Ich habe stattdessen zuerst eine pragmatische Loesung umgesetzt:
+
+1. kommende Folgen als eigene Karten rendern
+2. diese auf Episodenseiten anzeigen
+3. danach auch auf Serienseiten anzeigen
+
+Das ist funktional verwandt, aber nicht identisch mit dem eigentlichen Wunsch.
+
+## Tatsaechlicher Zielzustand
+
+Der eigentliche Wunsch ist nach heutigem Stand:
+
+1. Jellyfin-Serienseite mit vorhandener Episodenliste offen
+2. unter der letzten bereits sichtbaren Folge sollen weitere kommende Folgen erscheinen
+3. diese sollen moeglichst wie native Jellyfin-Episodenkarten aussehen
+4. sie sollen ein Vorschaubild haben, wenn Jellyfin eines liefert
+5. das Releasedatum soll direkt sichtbar sein
+
+## Technischer naechster Schritt
+
+Die naechste sinnvolle Umsetzung ist nicht:
+
+- weitere separate Sektionen hinzufuegen
+
+Sondern:
+
+- die vorhandene Jellyfin-Episodenliste direkt erweitern
+- oder bestehende Episodenkarten-Struktur im selben Container nachbauen
+
+Das bedeutet wahrscheinlich:
+
+- gezielt den DOM-Container der Episodenliste finden
+- aus kommenden Episoden Karten erzeugen, die sich an Jellyfins vorhandener Listenstruktur orientieren
+- diese direkt nach den vorhandenen Folgen einfuegen
+
+## Versionsstand
+
+Bis jetzt wurden diese Versionen erzeugt:
+
+- `1.0.4.0`: Stabilitaets- und Injektionsfixes
+- `1.0.5.0`: kommende Folgen als eigene Karten fuer Episodenseiten
+- `1.0.6.0`: dieselbe Kartenlogik auch fuer Serienseiten
+
+## Offene Bewertung
+
+Die aktuelle Implementierung ist noch nicht zielgenau genug fuer den gewuenschten Look.
+
+Fachlich funktioniert die Richtung:
+
+- kommende Folgen laden
+- Bild und Datum anzeigen
+
+Aber die Einbettung in die Jellyfin-Oberflaeche ist noch nicht so, wie gewuenscht.
+
+## Neuer Zielzustand nach den letzten Referenzbildern
+
+Die neuen Screenshots praezisieren den Wunsch deutlich:
+
+- keine separate Vorschau-Sektion
+- keine eigenstaendige Kartenleiste ausserhalb der Episodenliste
+- stattdessen soll die bestehende Staffellogik weitergefuehrt werden
+- kommende Folgen der ganzen Staffel sollen sichtbar sein
+- diese sollen in derselben Inhaltslogik wie die vorhandenen Episoden auftauchen
+- zusaetzlich sollen Bild und Datum sichtbar sein
+
+Praktisch bedeutet das:
+
+- wenn in Jellyfin in einer Staffel bereits Episode 1 bis 4 sichtbar sind
+- und in den Metadaten Episode 5 bis 13 schon als zukuenftig vorhanden sind
+- dann sollen diese kommenden Episoden ebenfalls im selben Staffelkontext dargestellt werden
+
+## Was jetzt als Naechstes gemacht werden soll
+
+Der naechste technische Schritt ist nicht mehr:
+
+- eine separate Zusatzsektion unter die Seite zu setzen
+
+Sondern:
+
+- die vorhandene Staffel-/Episodenansicht direkt zu erweitern
+
+Geplante Umsetzung:
+
+1. den Container der vorhandenen Episodenansicht identifizieren
+2. erkennen, welche Staffel gerade sichtbar ist
+3. alle Episoden dieser Staffel aus Jellyfin laden
+4. kommende Episoden derselben Staffel filtern
+5. fuer diese Eintraege UI-Elemente erzeugen, die im selben visuellen Fluss erscheinen
+6. dabei Datum immer sichtbar machen
+7. Bild anzeigen, wenn Jellyfin zu der Folge ein verwertbares Bild liefert
+
+## Wichtige technische Konsequenz
+
+Das ist eine andere Umsetzung als bisher:
+
+- bisher wurden kommende Episoden als eigener Block gerendert
+- jetzt soll die bestehende Listen-/Staffelansicht selbst erweitert oder nachgebaut werden
+
+Das ist aufwaendiger, aber deutlich naeher an dem von den Screenshots gezeigten Wunsch.
+
+## Gestartete Umsetzung fuer den neuen Zielzustand
+
+Der aktuelle Umbau geht jetzt in genau diese Richtung:
+
+- die bisherige separate Kartenleiste wird ersetzt
+- kommende Folgen werden nicht mehr als losgeloester Extra-Block gedacht
+- stattdessen werden sie an den vorhandenen Episodenbereich angehaengt
+
+Aktueller technischer Ansatz:
+
+1. sichtbare Staffel ueber die Seitenstruktur erkennen
+2. Episoden der Serie laden
+3. kommende Episoden derselben Staffel filtern
+4. diese als fortlaufende Eintraege an den Episodencontainer anhaengen
+5. pro Eintrag Bild, Episodencode, Titel und Datum anzeigen
+
+Damit ist die Richtung jetzt naeher an:
+
+- "Staffel geht weiter"
+
+Und weiter weg von:
+
+- "separate Vorschau-Sektion"
+
 ## Schnellcheck bei Problemen
 
 Wenn das Badge nicht erscheint, dann zuerst:

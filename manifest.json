@@ -8,11 +8,11 @@
     "category": "UI Enhancement",
     "versions": [
       {
-        "version": "1.0.6.0",
-        "changelog": "Shows upcoming episode cards on series pages as well, with artwork and release dates, plus earlier stability fixes.",
+        "version": "1.0.7.0",
+        "changelog": "Appends upcoming episodes to the visible season area with artwork and release dates, plus earlier stability fixes.",
         "targetAbi": "10.10.0.0",
-        "sourceUrl": "https://github.com/HolziDape/next-airing-episode/releases/download/v1.0.6/Jellyfin.Plugin.NextAiringEpisode_1.0.6.0.zip",
-        "checksum": "6e41b4626e5d3e7ede6f5a8310134fa0",
+        "sourceUrl": "https://github.com/HolziDape/next-airing-episode/releases/download/v1.0.7/Jellyfin.Plugin.NextAiringEpisode_1.0.7.0.zip",
+        "checksum": "",
         "timestamp": "2026-04-22T00:00:00Z"
       }
     ]
