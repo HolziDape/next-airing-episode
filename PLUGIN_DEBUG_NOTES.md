@@ -138,6 +138,10 @@ Auswirkung:
   - `GenerateAssemblyInfo` wieder aktiviert
   - explizite `AssemblyVersion`, `FileVersion` und `InformationalVersion` gesetzt
   - Ziel: Jellyfin soll nicht mehr `0.0.0.0` fuer das installierte Plugin anzeigen
+- weiterer DOM-Fix fuer Serien-/Staffelansicht:
+  - `#childrenCollapsible` / `#childrenContent` werden als primaere Quelle fuer Episodenlisten priorisiert
+  - sichtbare Cast-/People-Reihen werden bei der Template-Wahl stark abgewertet
+  - `listItem-largeImage` und echte Children-Bereiche werden hoeher gewichtet als allgemeine Kartencontainer
 
 ### `README.md`
 

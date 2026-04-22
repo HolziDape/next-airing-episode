@@ -79,8 +79,8 @@ README.md
 
 ## Current version
 
-- plugin assembly version: `1.0.9.0`
-- web script version: `1.0.8`
+- plugin assembly version: `1.0.10.0`
+- web script version: `1.0.10`
 
 ## Development notes
 
@@ -88,5 +88,6 @@ README.md
 - `src/next-episode.js` contains all client-side logic
 - `manifest.json` is used by the Jellyfin plugin catalog
 - `1.0.9` fixes plugin assembly/file version metadata so Jellyfin no longer reports `0.0.0.0`
+- `1.0.10` prioritizes Jellyfin's actual children episode container on detail pages so cast/other card rows are not used as the template source
 
 For project analysis, fixes, and troubleshooting, see [PLUGIN_DEBUG_NOTES.md](PLUGIN_DEBUG_NOTES.md).

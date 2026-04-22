@@ -4,7 +4,7 @@
  * Shows when the next unaired episode of a series will air,
  * directly on the series detail page in Jellyfin.
  *
- * @version     1.0.8
+ * @version     1.0.10
  * @author      HolziDape
  * @license     MIT
  * @repository  https://github.com/HolziDape/next-airing-episode
@@ -13,7 +13,7 @@
 (function () {
   'use strict';
 
-  const VERSION = '1.0.8';
+  const VERSION = '1.0.10';
   const BADGE_ID = 'next-airing-episode-badge';
   const UPCOMING_ITEM_CLASS = 'next-airing-episode-upcoming-item';
   const UPCOMING_ITEM_ATTR = 'data-next-airing-episode';
@@ -370,28 +370,87 @@
     return Array.from(new Set(nodes.filter(Boolean)));
   }
 
-  function getEpisodeNodeCandidates() {
+  function getPreferredEpisodeContainers() {
     const selectors = [
-      '.childrenItemsContainer .listItem',
-      '.childrenItemsContainer .cardBox',
-      '.childrenItemsContainer .card',
-      '.childrenItemsContainer .itemAction',
-      '.detailPageSecondaryContainer .listItem',
-      '.detailPageSecondaryContainer .cardBox',
-      '.detailPageSecondaryContainer .card',
-      '.detailPageSecondaryContainer .itemAction',
-      '.verticalSection .listItem',
-      '.verticalSection .cardBox',
-      '.verticalSection .card',
+      '#childrenCollapsible .childrenItemsContainer .itemsContainer',
+      '#childrenContent .childrenItemsContainer .itemsContainer',
+      '#childrenCollapsible .itemsContainer',
+      '#childrenContent .itemsContainer',
+      '.childrenItemsContainer .itemsContainer',
     ];
 
     return uniqueNodes(
       selectors.flatMap((selector) => Array.from(document.querySelectorAll(selector)))
+    ).filter((node) => isVisible(node));
+  }
+
+  function getEpisodeNodeCandidates() {
+    const itemSelectors = [
+      '.listItem',
+      '.listItem-largeImage',
+      '.cardBox',
+      '.card',
+      '.itemAction',
+    ];
+
+    const preferredContainers = getPreferredEpisodeContainers();
+    const preferredNodes = preferredContainers.flatMap((container) =>
+      itemSelectors.flatMap((selector) => Array.from(container.querySelectorAll(`:scope > ${selector}, ${selector}`)))
     );
+
+    const fallbackSelectors = [
+      '.childrenItemsContainer .listItem',
+      '.childrenItemsContainer .listItem-largeImage',
+      '.childrenItemsContainer .cardBox',
+      '.childrenItemsContainer .card',
+      '.detailPageSecondaryContainer .listItem',
+      '.detailPageSecondaryContainer .listItem-largeImage',
+      '.detailPageSecondaryContainer .cardBox',
+      '.detailPageSecondaryContainer .card',
+      '.verticalSection .listItem',
+      '.verticalSection .listItem-largeImage',
+      '.verticalSection .cardBox',
+      '.verticalSection .card',
+    ];
+
+    const fallbackNodes = fallbackSelectors.flatMap((selector) => Array.from(document.querySelectorAll(selector)));
+    return uniqueNodes([...preferredNodes, ...fallbackNodes]);
   }
 
   function getSectionRoot(node) {
-    return node.closest('.childrenItemsContainer, .verticalSection, .detailPageSecondaryContainer, section') || node.parentElement;
+    return node.closest(
+      '#childrenCollapsible, #childrenContent, .childrenItemsContainer, .verticalSection, .detailPageSecondaryContainer, section'
+    ) || node.parentElement;
+  }
+
+  function getNodeEpisodeWeight(node, item) {
+    let score = 0;
+    const section = item.section;
+    const text = normalizeText(node.textContent);
+
+    if (section && (section.id === 'childrenCollapsible' || section.id === 'childrenContent')) {
+      score += 5000;
+    }
+    if (node.closest('#childrenCollapsible, #childrenContent')) {
+      score += 3000;
+    }
+    if (node.classList.contains('listItem-largeImage')) {
+      score += 500;
+    }
+    if (node.classList.contains('listItem')) {
+      score += 300;
+    }
+    if (node.classList.contains('cardBox') || node.classList.contains('card')) {
+      score += 150;
+    }
+    if (item.episode.Type === 'Episode') {
+      score += 1000;
+    }
+    if (text.includes(normalizeText(item.episode.Name))) {
+      score += 400;
+    }
+
+    return score;
   }
 
   function collectNativeEpisodeItems(episodesById) {
@@ -406,8 +465,13 @@
           itemId,
           episode,
           section: getSectionRoot(node),
+          weight: 0,
         } : null;
       })
+      .map((item) => ({
+        ...item,
+        weight: getNodeEpisodeWeight(item.node, item),
+      }))
       .filter(Boolean);
   }
 
@@ -432,7 +496,8 @@
       const preferredCount = preferredSeasonNumber == null
         ? 0
         : groupItems.filter((item) => Number(item.episode.ParentIndexNumber) === Number(preferredSeasonNumber)).length;
-      const score = preferredCount * 1000 + groupItems.length;
+      const groupWeight = groupItems.reduce((sum, item) => sum + item.weight, 0);
+      const score = preferredCount * 10000 + groupWeight + groupItems.length;
       if (score > bestScore) {
         bestScore = score;
         bestGroup = groupItems;
