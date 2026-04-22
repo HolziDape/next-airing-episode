@@ -134,6 +134,10 @@ Auswirkung:
 - Assembly-Version auf `1.0.3.0` gesetzt
 - `ExcludeAssets=runtime` fuer `Jellyfin.Model` und `Jellyfin.Controller` gesetzt, damit keine unpassenden Runtime-Assets mitgezogen werden
 - aktueller lokaler Stand fuer den nativen Listen-Ansatz: `1.0.8.0`
+- spaeterer Fix fuer Jellyfin Plugin-Ansicht:
+  - `GenerateAssemblyInfo` wieder aktiviert
+  - explizite `AssemblyVersion`, `FileVersion` und `InformationalVersion` gesetzt
+  - Ziel: Jellyfin soll nicht mehr `0.0.0.0` fuer das installierte Plugin anzeigen
 
 ### `README.md`
 

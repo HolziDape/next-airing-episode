@@ -8,11 +8,11 @@
     "category": "UI Enhancement",
     "versions": [
       {
-        "version": "1.0.8.0",
-        "changelog": "Continues the native Jellyfin episode list with upcoming episodes by cloning visible episode entries on Web/Desktop.",
+        "version": "1.0.9.0",
+        "changelog": "Fixes assembly version metadata so Jellyfin no longer reports the installed plugin as version 0.0.0.0.",
         "targetAbi": "10.10.0.0",
-        "sourceUrl": "https://github.com/HolziDape/next-airing-episode/releases/download/v1.0.8/Jellyfin.Plugin.NextAiringEpisode_1.0.8.0.zip",
-        "checksum": "733613e14246c4645670c9e2eb5d0494",
+        "sourceUrl": "https://github.com/HolziDape/next-airing-episode/releases/download/v1.0.9/Jellyfin.Plugin.NextAiringEpisode_1.0.9.0.zip",
+        "checksum": "",
         "timestamp": "2026-04-22T00:00:00Z"
       }
     ]
