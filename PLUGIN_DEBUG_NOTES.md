@@ -112,6 +112,10 @@ Auswirkung:
 - Schutz gegen Race Conditions bei mehreren parallelen Abfragen
 - Badge-Inhalt ueber DOM-Elemente statt unsicherem HTML-Aufbau
 - ASCII-Only Texte fuer stabilere Darstellung in problematischen Shells
+- Episodenseiten erweitert:
+  - neue Sektion `Kommende Folgen`
+  - Karten mit Preview-Bild, Episodenkennung, Releasedatum und Kurzbeschreibung
+  - Positionierung nach der Episodenliste bzw. im Detailbereich als Fallback
 
 ### `manifest.json`
 
@@ -155,6 +159,10 @@ Das Plugin arbeitet weiterhin ueber HTML-Injektion. Das ist praktisch, aber bei 
 3. Server-Log nach `[Next Airing Episode]` filtern
 4. Browser-Konsole auf der Serienseite pruefen
 5. Verifizieren, dass unaired episodes in Jellyfin-Metadaten vorhanden sind
+
+## Wunsch aus der UI-Anpassung
+
+Der neue Wunsch war, dass auf einer Episodenseite unter der aktuellen bzw. letzten sichtbaren Folge weitere kommende Folgen erscheinen. Dafuer wurde die Client-Logik erweitert, damit Jellyfin auf Episodenseiten mehrere kuenftige Episoden als Vorschau anzeigt statt nur eines einzelnen Badges auf Serienseiten.
 
 ## Schnellcheck bei Problemen
 

@@ -11,6 +11,14 @@ The plugin injects a small badge into the Jellyfin web UI. When a user opens a s
 - relative air date
 - absolute air date
 
+When a user opens an episode page, the plugin can also show a "Kommende Folgen" row with:
+
+- preview image when Jellyfin has one
+- season and episode number
+- episode title
+- release date
+- short overview
+
 The plugin only uses the local Jellyfin API. No external service is called by the JavaScript itself.
 
 ## How it works
@@ -21,6 +29,7 @@ The plugin only uses the local Jellyfin API. No external service is called by th
 4. On a series page it fetches episodes from the Jellyfin API.
 5. It finds the first episode whose `PremiereDate` is in the future.
 6. It renders a badge under the series metadata area.
+7. On an episode page it renders a row of upcoming episodes with image and release date.
 
 ## Requirements
 
@@ -70,8 +79,8 @@ README.md
 
 ## Current version
 
-- plugin assembly version: `1.0.4.0`
-- web script version: `1.0.4`
+- plugin assembly version: `1.0.5.0`
+- web script version: `1.0.5`
 
 ## Development notes
 
