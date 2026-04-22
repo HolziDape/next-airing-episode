@@ -4,7 +4,7 @@
  * Shows when the next unaired episode of a series will air,
  * directly on the series detail page in Jellyfin.
  *
- * @version     1.0.5
+ * @version     1.0.6
  * @author      HolziDape
  * @license     MIT
  * @repository  https://github.com/HolziDape/next-airing-episode
@@ -13,7 +13,7 @@
 (function () {
   'use strict';
 
-  const VERSION = '1.0.5';
+  const VERSION = '1.0.6';
   const BADGE_ID = 'next-airing-episode-badge';
   const UPCOMING_SECTION_ID = 'next-airing-episode-upcoming';
   const SCRIPT_TAG = '[Next Airing Episode]';
@@ -361,19 +361,20 @@
   }
 
   async function renderSeriesPage(itemId, runId) {
-    removeUpcomingSection();
-
     const episodes = await fetchSeriesEpisodes(itemId);
     if (runId !== currentRun) {
       return;
     }
 
-    const nextEpisode = getUpcomingEpisodes(episodes, null)[0] || null;
+    const upcomingEpisodes = getUpcomingEpisodes(episodes, null);
+    const nextEpisode = upcomingEpisodes[0] || null;
     if (nextEpisode) {
       injectBadge(nextEpisode);
     } else {
       removeBadge();
     }
+
+    injectUpcomingEpisodes(upcomingEpisodes);
   }
 
   async function renderEpisodePage(itemId, runId) {

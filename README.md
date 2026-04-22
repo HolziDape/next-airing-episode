@@ -11,7 +11,7 @@ The plugin injects a small badge into the Jellyfin web UI. When a user opens a s
 - relative air date
 - absolute air date
 
-When a user opens an episode page, the plugin can also show a "Kommende Folgen" row with:
+When a user opens a series page or an episode page, the plugin can also show a "Kommende Folgen" row with:
 
 - preview image when Jellyfin has one
 - season and episode number
@@ -79,8 +79,8 @@ README.md
 
 ## Current version
 
-- plugin assembly version: `1.0.5.0`
-- web script version: `1.0.5`
+- plugin assembly version: `1.0.6.0`
+- web script version: `1.0.6`
 
 ## Development notes
 

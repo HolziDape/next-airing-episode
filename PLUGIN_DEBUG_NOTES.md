@@ -116,6 +116,8 @@ Auswirkung:
   - neue Sektion `Kommende Folgen`
   - Karten mit Preview-Bild, Episodenkennung, Releasedatum und Kurzbeschreibung
   - Positionierung nach der Episodenliste bzw. im Detailbereich als Fallback
+- Serienansicht erweitert:
+  - kommende Folgen werden jetzt auch auf der normalen Serienseite unterhalb des Episodenbereichs angezeigt
 
 ### `manifest.json`
 
