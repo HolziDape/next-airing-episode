@@ -8,11 +8,11 @@
     "category": "UI Enhancement",
     "versions": [
       {
-        "version": "1.0.7.0",
-        "changelog": "Appends upcoming episodes to the visible season area with artwork and release dates, plus earlier stability fixes.",
+        "version": "1.0.8.0",
+        "changelog": "Continues the native Jellyfin episode list with upcoming episodes by cloning visible episode entries on Web/Desktop.",
         "targetAbi": "10.10.0.0",
-        "sourceUrl": "https://github.com/HolziDape/next-airing-episode/releases/download/v1.0.7/Jellyfin.Plugin.NextAiringEpisode_1.0.7.0.zip",
-        "checksum": "8f8395b5ce0f11bde95ac093ca6fe883",
+        "sourceUrl": "https://github.com/HolziDape/next-airing-episode/releases/download/v1.0.8/Jellyfin.Plugin.NextAiringEpisode_1.0.8.0.zip",
+        "checksum": "",
         "timestamp": "2026-04-22T00:00:00Z"
       }
     ]
