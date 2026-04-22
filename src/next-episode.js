@@ -15,7 +15,6 @@
 
   const VERSION = '1.0.7';
   const BADGE_ID = 'next-airing-episode-badge';
-  const UPCOMING_SECTION_ID = 'next-airing-episode-upcoming';
   const UPCOMING_ITEM_CLASS = 'next-airing-episode-upcoming-item';
   const SCRIPT_TAG = '[Next Airing Episode]';
   const LOCALE = 'de-DE';
@@ -163,7 +162,6 @@
   }
 
   function removeUpcomingSection() {
-    document.getElementById(UPCOMING_SECTION_ID)?.remove();
     document.querySelectorAll(`.${UPCOMING_ITEM_CLASS}`).forEach((node) => node.remove());
   }
 
@@ -292,32 +290,49 @@
     return null;
   }
 
+  function getItemHref(itemId) {
+    if (!itemId) {
+      return '#';
+    }
+
+    try {
+      const url = new URL(location.href);
+      url.searchParams.set('id', itemId);
+      return url.toString();
+    } catch {
+      return `?id=${encodeURIComponent(itemId)}`;
+    }
+  }
+
   function buildInlineEpisode(episode) {
-    const item = document.createElement('article');
+    const item = document.createElement('a');
     item.className = UPCOMING_ITEM_CLASS;
+    item.href = getItemHref(episode.Id);
     item.style.cssText = [
       'display:flex',
       'align-items:stretch',
-      'gap:18px',
+      'gap:16px',
       'width:100%',
-      'margin-top:14px',
-      'padding:10px',
-      'border-radius:16px',
-      'background:rgba(255,255,255,.045)',
-      'border:1px solid rgba(255,255,255,.08)',
-      'box-shadow:0 12px 28px rgba(0,0,0,.22)',
+      'margin-top:6px',
+      'padding:8px 0',
+      'border-radius:0',
+      'background:transparent',
+      'border-top:1px solid rgba(255,255,255,.06)',
+      'text-decoration:none',
+      'color:inherit',
+      'cursor:pointer',
       'overflow:hidden',
     ].join(';');
 
     const visual = document.createElement('div');
     visual.style.cssText = [
       'position:relative',
-      'flex:0 0 38%',
-      'max-width:380px',
-      'min-height:132px',
-      'border-radius:12px',
+      'flex:0 0 34%',
+      'max-width:320px',
+      'min-height:108px',
+      'border-radius:8px',
       'overflow:hidden',
-      'background:linear-gradient(135deg, rgba(0,164,220,.35), rgba(12,27,39,.95))',
+      'background:linear-gradient(135deg, rgba(0,164,220,.18), rgba(12,27,39,.62))',
     ].join(';');
 
     const imageUrl = getImageUrl(episode);
@@ -326,23 +341,23 @@
       image.src = imageUrl;
       image.alt = episode.Name || 'Upcoming episode';
       image.loading = 'lazy';
-      image.style.cssText = 'width:100%;height:100%;min-height:132px;object-fit:cover;display:block';
+      image.style.cssText = 'width:100%;height:100%;min-height:108px;object-fit:cover;display:block';
       visual.appendChild(image);
     } else {
-      visual.appendChild(createLine('Kein Bild', 'padding:18px;font-weight:700;color:#dff7ff'));
+      visual.appendChild(createLine('Kein Bild', 'padding:16px;font-weight:700;color:#dff7ff'));
     }
 
     const dateChip = document.createElement('div');
     dateChip.textContent = formatRelative(episode.PremiereDate);
     dateChip.style.cssText = [
       'position:absolute',
-      'left:10px',
-      'bottom:10px',
-      'padding:6px 10px',
+      'left:8px',
+      'bottom:8px',
+      'padding:5px 9px',
       'border-radius:999px',
-      'background:rgba(7,20,29,.84)',
-      'border:1px solid rgba(139,220,255,.35)',
-      'font-size:.78rem',
+      'background:rgba(7,20,29,.82)',
+      'border:1px solid rgba(139,220,255,.22)',
+      'font-size:.74rem',
       'font-weight:700',
       'color:#dff7ff',
       'backdrop-filter:blur(8px)',
@@ -350,15 +365,14 @@
     visual.appendChild(dateChip);
 
     const meta = document.createElement('div');
-    meta.style.cssText = 'display:flex;flex:1 1 auto;flex-direction:column;justify-content:center;min-width:0';
-    meta.appendChild(createLine(createEpisodeCode(episode), 'font-size:.82rem;font-weight:800;letter-spacing:.08em;color:#8bdcff;text-transform:uppercase'));
-    meta.appendChild(createLine(episode.Name || 'TBA', 'margin-top:5px;font-size:1.45rem;font-weight:800;line-height:1.15;color:#fff'));
-    meta.appendChild(createLine(formatRelative(episode.PremiereDate), 'margin-top:9px;font-size:.94rem;color:rgba(255,255,255,.74)'));
+    meta.style.cssText = 'display:flex;flex:1 1 auto;flex-direction:column;justify-content:center;min-width:0;padding-right:8px';
+    meta.appendChild(createLine(createLabel(episode), 'font-size:1rem;font-weight:700;line-height:1.25;color:#f3f3f3'));
+    meta.appendChild(createLine(formatRelative(episode.PremiereDate), 'margin-top:6px;font-size:.92rem;color:rgba(255,255,255,.78)'));
 
     if (episode.Overview) {
       meta.appendChild(createLine(
         episode.Overview,
-        'margin-top:10px;font-size:.92rem;line-height:1.45;color:rgba(255,255,255,.72);display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden'
+        'margin-top:8px;font-size:.9rem;line-height:1.4;color:rgba(255,255,255,.62);display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden'
       ));
     }
 
@@ -378,16 +392,9 @@
       return;
     }
 
-    const wrapper = document.createElement('div');
-    wrapper.id = UPCOMING_SECTION_ID;
-    wrapper.style.cssText = 'display:flex;flex-direction:column;width:100%;margin-top:12px';
-    wrapper.appendChild(createLine('Kommende Folgen', 'margin-top:6px;margin-bottom:8px;font-size:1rem;font-weight:800;color:#dff7ff'));
-
     for (const episode of episodes) {
-      wrapper.appendChild(buildInlineEpisode(episode));
+      anchor.appendChild(buildInlineEpisode(episode));
     }
-
-    anchor.appendChild(wrapper);
   }
 
   function getUpcomingEpisodes(allEpisodes, currentEpisodeId, seasonNumber) {
