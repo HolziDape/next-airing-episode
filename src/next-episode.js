@@ -4,7 +4,7 @@
  * Shows when the next unaired episode of a series will air,
  * directly on the series detail page in Jellyfin.
  *
- * @version     1.0.7
+ * @version     1.0.8
  * @author      HolziDape
  * @license     MIT
  * @repository  https://github.com/HolziDape/next-airing-episode
@@ -13,9 +13,10 @@
 (function () {
   'use strict';
 
-  const VERSION = '1.0.7';
+  const VERSION = '1.0.8';
   const BADGE_ID = 'next-airing-episode-badge';
   const UPCOMING_ITEM_CLASS = 'next-airing-episode-upcoming-item';
+  const UPCOMING_ITEM_ATTR = 'data-next-airing-episode';
   const SCRIPT_TAG = '[Next Airing Episode]';
   const LOCALE = 'de-DE';
   let currentRun = 0;
@@ -157,12 +158,31 @@
     return episode.Name ? `${createEpisodeCode(episode)} - ${episode.Name}` : createEpisodeCode(episode);
   }
 
+  function createDisplayTitle(episode) {
+    if (episode.IndexNumber != null && episode.Name) {
+      return `${episode.IndexNumber}. ${episode.Name}`;
+    }
+
+    return episode.Name || createLabel(episode);
+  }
+
+  function normalizeText(value) {
+    return String(value || '')
+      .replace(/\s+/g, ' ')
+      .trim()
+      .toLowerCase();
+  }
+
+  function isVisible(element) {
+    return Boolean(element && element.isConnected && element.getClientRects().length);
+  }
+
   function removeBadge() {
     document.getElementById(BADGE_ID)?.remove();
   }
 
   function removeUpcomingSection() {
-    document.querySelectorAll(`.${UPCOMING_ITEM_CLASS}`).forEach((node) => node.remove());
+    document.querySelectorAll(`[${UPCOMING_ITEM_ATTR}="true"]`).forEach((node) => node.remove());
   }
 
   function removeUi() {
@@ -230,27 +250,18 @@
     }
   }
 
-  function getVisibleSeasonNumber() {
-    const selectors = [
-      '.childrenItemsContainer h2',
-      '.verticalSection h2',
-      '.sectionTitle',
-      '.listName',
-      'h2',
-      'h3',
-    ];
-
-    for (const selector of selectors) {
-      for (const node of document.querySelectorAll(selector)) {
-        const text = (node.textContent || '').trim();
-        const match = text.match(/Season\s+(\d+)/i);
-        if (match) {
-          return Number(match[1]);
-        }
-      }
+  function getItemHref(itemId) {
+    if (!itemId) {
+      return '#';
     }
 
-    return null;
+    try {
+      const url = new URL(location.href);
+      url.searchParams.set('id', itemId);
+      return url.toString();
+    } catch {
+      return `?id=${encodeURIComponent(itemId)}`;
+    }
   }
 
   function getImageUrl(item) {
@@ -271,129 +282,452 @@
     return null;
   }
 
-  function findEpisodeListAnchor() {
+  function getVisibleSeasonNumber() {
     const selectors = [
-      '.childrenItemsContainer .itemsContainer',
-      '.childrenItemsContainer',
-      '.episodes',
-      '.detailPageSecondaryContainer .itemsContainer',
-      '.detailPageSecondaryContainer',
+      '.childrenItemsContainer h2',
+      '.verticalSection h2',
+      '.sectionTitle',
+      '.listName',
+      'h2',
+      'h3',
     ];
 
     for (const selector of selectors) {
-      const element = document.querySelector(selector);
-      if (element) {
-        return element;
+      for (const node of document.querySelectorAll(selector)) {
+        const text = (node.textContent || '').trim();
+        const match = text.match(/(?:season|staffel)\s+(\d+)/i);
+        if (match) {
+          return Number(match[1]);
+        }
       }
     }
 
     return null;
   }
 
-  function getItemHref(itemId) {
-    if (!itemId) {
-      return '#';
+  function parseItemIdFromHref(href) {
+    if (!href) {
+      return null;
     }
 
     try {
-      const url = new URL(location.href);
-      url.searchParams.set('id', itemId);
-      return url.toString();
+      const directUrl = new URL(href, location.origin);
+      const directId = directUrl.searchParams.get('id');
+      if (directId) {
+        return directId;
+      }
+
+      if (directUrl.hash) {
+        const hashUrl = new URL(directUrl.hash.replace(/^#/, ''), location.origin);
+        return hashUrl.searchParams.get('id');
+      }
     } catch {
-      return `?id=${encodeURIComponent(itemId)}`;
+      const match = href.match(/[?&]id=([^&#]+)/i) || href.match(/\/details\?id=([^&#]+)/i);
+      if (match) {
+        return decodeURIComponent(match[1]);
+      }
+    }
+
+    return null;
+  }
+
+  function getNodeItemId(node) {
+    if (!node) {
+      return null;
+    }
+
+    const dataKeys = ['id', 'itemid', 'itemId'];
+    for (const key of dataKeys) {
+      const value = node.dataset ? node.dataset[key] : null;
+      if (value) {
+        return value;
+      }
+    }
+
+    for (const attr of ['data-id', 'data-itemid', 'data-item-id']) {
+      const value = node.getAttribute(attr);
+      if (value) {
+        return value;
+      }
+    }
+
+    if (typeof node.href === 'string') {
+      const hrefId = parseItemIdFromHref(node.href);
+      if (hrefId) {
+        return hrefId;
+      }
+    }
+
+    const linkedNode = node.matches('a[href]') ? node : node.querySelector('a[href]');
+    if (linkedNode) {
+      return parseItemIdFromHref(linkedNode.getAttribute('href'));
+    }
+
+    return null;
+  }
+
+  function uniqueNodes(nodes) {
+    return Array.from(new Set(nodes.filter(Boolean)));
+  }
+
+  function getEpisodeNodeCandidates() {
+    const selectors = [
+      '.childrenItemsContainer .listItem',
+      '.childrenItemsContainer .cardBox',
+      '.childrenItemsContainer .card',
+      '.childrenItemsContainer .itemAction',
+      '.detailPageSecondaryContainer .listItem',
+      '.detailPageSecondaryContainer .cardBox',
+      '.detailPageSecondaryContainer .card',
+      '.detailPageSecondaryContainer .itemAction',
+      '.verticalSection .listItem',
+      '.verticalSection .cardBox',
+      '.verticalSection .card',
+    ];
+
+    return uniqueNodes(
+      selectors.flatMap((selector) => Array.from(document.querySelectorAll(selector)))
+    );
+  }
+
+  function getSectionRoot(node) {
+    return node.closest('.childrenItemsContainer, .verticalSection, .detailPageSecondaryContainer, section') || node.parentElement;
+  }
+
+  function collectNativeEpisodeItems(episodesById) {
+    return getEpisodeNodeCandidates()
+      .filter((node) => isVisible(node))
+      .filter((node) => node.getAttribute(UPCOMING_ITEM_ATTR) !== 'true')
+      .map((node) => {
+        const itemId = getNodeItemId(node);
+        const episode = itemId ? episodesById.get(itemId) : null;
+        return itemId && episode ? {
+          node,
+          itemId,
+          episode,
+          section: getSectionRoot(node),
+        } : null;
+      })
+      .filter(Boolean);
+  }
+
+  function chooseEpisodeGroup(items, preferredSeasonNumber) {
+    if (!items.length) {
+      return null;
+    }
+
+    const groups = new Map();
+    for (const item of items) {
+      const key = item.section || item.node.parentElement;
+      if (!groups.has(key)) {
+        groups.set(key, []);
+      }
+
+      groups.get(key).push(item);
+    }
+
+    let bestGroup = null;
+    let bestScore = -1;
+    for (const groupItems of groups.values()) {
+      const preferredCount = preferredSeasonNumber == null
+        ? 0
+        : groupItems.filter((item) => Number(item.episode.ParentIndexNumber) === Number(preferredSeasonNumber)).length;
+      const score = preferredCount * 1000 + groupItems.length;
+      if (score > bestScore) {
+        bestScore = score;
+        bestGroup = groupItems;
+      }
+    }
+
+    return bestGroup;
+  }
+
+  function findNativeEpisodeContext(episodes, preferredSeasonNumber) {
+    const episodesById = new Map(episodes.map((episode) => [episode.Id, episode]));
+    const nativeItems = collectNativeEpisodeItems(episodesById);
+    if (!nativeItems.length) {
+      return null;
+    }
+
+    const selectedGroup = chooseEpisodeGroup(nativeItems, preferredSeasonNumber);
+    if (!selectedGroup || !selectedGroup.length) {
+      return null;
+    }
+
+    let seasonItems = selectedGroup;
+    if (preferredSeasonNumber != null) {
+      const preferredItems = selectedGroup.filter(
+        (item) => Number(item.episode.ParentIndexNumber) === Number(preferredSeasonNumber)
+      );
+      if (preferredItems.length) {
+        seasonItems = preferredItems;
+      }
+    }
+
+    const templateItem = seasonItems[seasonItems.length - 1];
+    return {
+      templateNode: templateItem.node,
+      templateEpisode: templateItem.episode,
+      insertAfter: templateItem.node,
+      seasonItems,
+      seasonNumber: Number(templateItem.episode.ParentIndexNumber) || preferredSeasonNumber || null,
+    };
+  }
+
+  function getLeafTextElements(root) {
+    return Array.from(root.querySelectorAll('*')).filter((element) => {
+      if (!element.childElementCount) {
+        return normalizeText(element.textContent).length > 0;
+      }
+
+      return false;
+    });
+  }
+
+  function findBestLeaf(elements, scoreFn) {
+    let bestElement = null;
+    let bestScore = -1;
+
+    for (const element of elements) {
+      const score = scoreFn(element);
+      if (score > bestScore) {
+        bestScore = score;
+        bestElement = element;
+      }
+    }
+
+    return bestElement;
+  }
+
+  function getOverviewSnippet(text) {
+    return normalizeText(String(text || '').slice(0, 80));
+  }
+
+  function findTitleElement(root, sourceEpisode) {
+    const leaves = getLeafTextElements(root);
+    const sourceName = normalizeText(sourceEpisode.Name);
+    const sourceCode = normalizeText(createEpisodeCode(sourceEpisode));
+    const sourceLabel = normalizeText(createLabel(sourceEpisode));
+    const sourceDisplayTitle = normalizeText(createDisplayTitle(sourceEpisode));
+    const sourceIndexPrefix = sourceEpisode.IndexNumber != null
+      ? normalizeText(`${sourceEpisode.IndexNumber}.`)
+      : '';
+
+    return findBestLeaf(leaves, (element) => {
+      const text = normalizeText(element.textContent);
+      if (!text) {
+        return -1;
+      }
+
+      let score = text.length;
+      if (sourceName && text.includes(sourceName)) {
+        score += 2000;
+      }
+      if (sourceDisplayTitle && text === sourceDisplayTitle) {
+        score += 1800;
+      }
+      if (sourceLabel && text.includes(sourceLabel)) {
+        score += 1500;
+      }
+      if (sourceCode && text.includes(sourceCode)) {
+        score += 1200;
+      }
+      if (sourceIndexPrefix && text.startsWith(sourceIndexPrefix)) {
+        score += 900;
+      }
+
+      return score;
+    });
+  }
+
+  function findOverviewElement(root, sourceEpisode, titleElement) {
+    const leaves = getLeafTextElements(root).filter((element) => element !== titleElement);
+    const overviewSnippet = getOverviewSnippet(sourceEpisode.Overview);
+    if (!overviewSnippet) {
+      return null;
+    }
+
+    return findBestLeaf(leaves, (element) => {
+      const text = normalizeText(element.textContent);
+      if (!text) {
+        return -1;
+      }
+
+      let score = 0;
+      if (text.includes(overviewSnippet)) {
+        score += 2000;
+      }
+
+      score += Math.min(text.length, 200);
+      return score;
+    });
+  }
+
+  function findInfoElement(root, titleElement, overviewElement) {
+    const leaves = getLeafTextElements(root).filter((element) => element !== titleElement && element !== overviewElement);
+    return findBestLeaf(leaves, (element) => {
+      const text = normalizeText(element.textContent);
+      if (!text) {
+        return -1;
+      }
+
+      const textLength = text.length;
+      let score = 100 - Math.min(Math.abs(textLength - 22), 100);
+      if (/\d/.test(text)) {
+        score += 25;
+      }
+      if (/end|endet|min|m$|heute|morgen|tage|uhr/.test(text)) {
+        score += 50;
+      }
+
+      return score;
+    });
+  }
+
+  function replaceTextContent(element, value) {
+    if (element) {
+      element.textContent = value;
+      element.style.removeProperty('display');
     }
   }
 
-  function buildInlineEpisode(episode) {
-    const item = document.createElement('a');
-    item.className = UPCOMING_ITEM_CLASS;
-    item.href = getItemHref(episode.Id);
-    item.style.cssText = [
-      'display:flex',
-      'align-items:stretch',
-      'gap:16px',
-      'width:100%',
-      'margin-top:6px',
-      'padding:8px 0',
-      'border-radius:0',
-      'background:transparent',
-      'border-top:1px solid rgba(255,255,255,.06)',
-      'text-decoration:none',
-      'color:inherit',
-      'cursor:pointer',
-      'overflow:hidden',
-    ].join(';');
+  function hideElement(element) {
+    if (element) {
+      element.style.display = 'none';
+    }
+  }
 
-    const visual = document.createElement('div');
-    visual.style.cssText = [
-      'position:relative',
-      'flex:0 0 34%',
-      'max-width:320px',
-      'min-height:108px',
-      'border-radius:8px',
-      'overflow:hidden',
-      'background:linear-gradient(135deg, rgba(0,164,220,.18), rgba(12,27,39,.62))',
-    ].join(';');
+  function sanitizeClone(clone) {
+    clone.setAttribute(UPCOMING_ITEM_ATTR, 'true');
+    clone.classList.add(UPCOMING_ITEM_CLASS);
+    clone.removeAttribute('id');
+    clone.removeAttribute('data-id');
+    clone.removeAttribute('data-itemid');
+    clone.removeAttribute('data-item-id');
 
+    clone.querySelectorAll('[id]').forEach((element) => element.removeAttribute('id'));
+    clone.querySelectorAll(`[${UPCOMING_ITEM_ATTR}]`).forEach((element) => {
+      element.setAttribute(UPCOMING_ITEM_ATTR, 'true');
+    });
+
+    clone.querySelectorAll(
+      'button, [role="button"]:not(a), .cardOverlayContainer, .cardOverlayFab-primary, .listItemButtons,' +
+      '.listItemButton, .secondaryButtons, .mediaSourceIndicator, .playedIndicator, .playedPercentage,' +
+      '.itemProgressBar, .countIndicator, .selectionCommands, .editButton, .listItemMenu'
+    ).forEach((element) => element.remove());
+
+    clone.querySelectorAll('.selected, .played').forEach((element) => {
+      element.classList.remove('selected', 'played');
+    });
+  }
+
+  function updateNodeItemIds(node, itemId) {
+    if (!node || !itemId) {
+      return;
+    }
+
+    if (node.dataset) {
+      node.dataset.id = itemId;
+      node.dataset.itemid = itemId;
+      node.dataset.itemId = itemId;
+    }
+
+    for (const attr of ['data-id', 'data-itemid', 'data-item-id']) {
+      if (node.hasAttribute(attr) || attr === 'data-id') {
+        node.setAttribute(attr, itemId);
+      }
+    }
+  }
+
+  function updateLinks(root, episode) {
+    const href = getItemHref(episode.Id);
+    const links = root.matches('a[href]') ? [root] : Array.from(root.querySelectorAll('a[href]'));
+
+    for (const link of links) {
+      link.href = href;
+      updateNodeItemIds(link, episode.Id);
+
+      if (episode.Name) {
+        link.setAttribute('title', episode.Name);
+        link.setAttribute('aria-label', episode.Name);
+      }
+    }
+  }
+
+  function updateImage(root, episode) {
     const imageUrl = getImageUrl(episode);
-    if (imageUrl) {
-      const image = document.createElement('img');
-      image.src = imageUrl;
-      image.alt = episode.Name || 'Upcoming episode';
-      image.loading = 'lazy';
-      image.style.cssText = 'width:100%;height:100%;min-height:108px;object-fit:cover;display:block';
-      visual.appendChild(image);
-    } else {
-      visual.appendChild(createLine('Kein Bild', 'padding:16px;font-weight:700;color:#dff7ff'));
+    const images = root.matches('img') ? [root] : Array.from(root.querySelectorAll('img'));
+    if (!images.length) {
+      return;
     }
 
-    const dateChip = document.createElement('div');
-    dateChip.textContent = formatRelative(episode.PremiereDate);
-    dateChip.style.cssText = [
-      'position:absolute',
-      'left:8px',
-      'bottom:8px',
-      'padding:5px 9px',
-      'border-radius:999px',
-      'background:rgba(7,20,29,.82)',
-      'border:1px solid rgba(139,220,255,.22)',
-      'font-size:.74rem',
-      'font-weight:700',
-      'color:#dff7ff',
-      'backdrop-filter:blur(8px)',
-    ].join(';');
-    visual.appendChild(dateChip);
-
-    const meta = document.createElement('div');
-    meta.style.cssText = 'display:flex;flex:1 1 auto;flex-direction:column;justify-content:center;min-width:0;padding-right:8px';
-    meta.appendChild(createLine(createLabel(episode), 'font-size:1rem;font-weight:700;line-height:1.25;color:#f3f3f3'));
-    meta.appendChild(createLine(formatRelative(episode.PremiereDate), 'margin-top:6px;font-size:.92rem;color:rgba(255,255,255,.78)'));
-
-    if (episode.Overview) {
-      meta.appendChild(createLine(
-        episode.Overview,
-        'margin-top:8px;font-size:.9rem;line-height:1.4;color:rgba(255,255,255,.62);display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden'
-      ));
+    for (const image of images) {
+      if (imageUrl) {
+        image.src = imageUrl;
+        image.removeAttribute('srcset');
+        image.alt = episode.Name || 'Upcoming episode';
+        image.style.removeProperty('display');
+      } else {
+        image.removeAttribute('srcset');
+        image.removeAttribute('src');
+        image.alt = episode.Name || 'Upcoming episode';
+        image.style.opacity = '.18';
+      }
     }
-
-    item.appendChild(visual);
-    item.appendChild(meta);
-    return item;
   }
 
-  function injectUpcomingEpisodes(episodes) {
+  function updateText(root, sourceEpisode, targetEpisode) {
+    const titleElement = findTitleElement(root, sourceEpisode);
+    const overviewElement = findOverviewElement(root, sourceEpisode, titleElement);
+    let infoElement = findInfoElement(root, titleElement, overviewElement);
+
+    replaceTextContent(titleElement, createDisplayTitle(targetEpisode));
+
+    if (!infoElement && titleElement && titleElement.parentElement) {
+      infoElement = titleElement.cloneNode(false);
+      infoElement.className = titleElement.className;
+      infoElement.removeAttribute('style');
+      titleElement.insertAdjacentElement('afterend', infoElement);
+    }
+
+    replaceTextContent(infoElement, formatRelative(targetEpisode.PremiereDate));
+
+    if (targetEpisode.Overview) {
+      if (overviewElement) {
+        replaceTextContent(overviewElement, targetEpisode.Overview);
+      } else if (infoElement && infoElement.parentElement) {
+        const detailElement = infoElement.cloneNode(false);
+        detailElement.className = infoElement.className;
+        detailElement.removeAttribute('style');
+        detailElement.textContent = targetEpisode.Overview;
+        infoElement.insertAdjacentElement('afterend', detailElement);
+      }
+    } else {
+      hideElement(overviewElement);
+    }
+  }
+
+  function buildUpcomingEpisodeNode(context, episode) {
+    const clone = context.templateNode.cloneNode(true);
+    sanitizeClone(clone);
+    updateNodeItemIds(clone, episode.Id);
+    updateLinks(clone, episode);
+    updateImage(clone, episode);
+    updateText(clone, context.templateEpisode, episode);
+    return clone;
+  }
+
+  function injectUpcomingEpisodes(episodes, context) {
     removeUpcomingSection();
-    if (!episodes.length) {
+    if (!episodes.length || !context) {
       return;
     }
 
-    const anchor = findEpisodeListAnchor();
-    if (!anchor) {
-      return;
-    }
-
+    let insertAfter = context.insertAfter;
     for (const episode of episodes) {
-      anchor.appendChild(buildInlineEpisode(episode));
+      const clone = buildUpcomingEpisodeNode(context, episode);
+      insertAfter.insertAdjacentElement('afterend', clone);
+      insertAfter = clone;
     }
   }
 
@@ -406,23 +740,41 @@
       .filter((episode) => seasonNumber == null || Number(episode.ParentIndexNumber) === Number(seasonNumber));
   }
 
+  function renderNativeUpcomingEpisodes(episodes, currentEpisodeId, preferredSeasonNumber) {
+    const context = findNativeEpisodeContext(episodes, preferredSeasonNumber);
+    if (!context) {
+      removeUpcomingSection();
+      console.info(`${SCRIPT_TAG} no native desktop episode list found; skipping upcoming episode injection`);
+      return { nextVisibleUpcoming: null, seasonNumber: preferredSeasonNumber || null };
+    }
+
+    const visibleIds = new Set(context.seasonItems.map((item) => item.episode.Id));
+    const upcomingEpisodes = getUpcomingEpisodes(episodes, currentEpisodeId, context.seasonNumber)
+      .filter((episode) => !visibleIds.has(episode.Id));
+
+    injectUpcomingEpisodes(upcomingEpisodes, context);
+
+    return {
+      nextVisibleUpcoming: upcomingEpisodes[0] || null,
+      seasonNumber: context.seasonNumber,
+    };
+  }
+
   async function renderSeriesPage(itemId, runId) {
     const episodes = await fetchSeriesEpisodes(itemId);
     if (runId !== currentRun) {
       return;
     }
 
-    const visibleSeasonNumber = getVisibleSeasonNumber();
-    const upcomingEpisodes = getUpcomingEpisodes(episodes, null, visibleSeasonNumber);
-    const nextEpisode = upcomingEpisodes[0] || getUpcomingEpisodes(episodes, null, null)[0] || null;
+    const preferredSeasonNumber = getVisibleSeasonNumber();
+    const { nextVisibleUpcoming } = renderNativeUpcomingEpisodes(episodes, null, preferredSeasonNumber);
+    const nextEpisode = nextVisibleUpcoming || getUpcomingEpisodes(episodes, null, null)[0] || null;
 
     if (nextEpisode) {
       injectBadge(nextEpisode);
     } else {
       removeBadge();
     }
-
-    injectUpcomingEpisodes(upcomingEpisodes);
   }
 
   async function renderEpisodePage(itemId, runId) {
@@ -443,7 +795,7 @@
       return;
     }
 
-    injectUpcomingEpisodes(getUpcomingEpisodes(episodes, itemId, item.ParentIndexNumber || getVisibleSeasonNumber()));
+    renderNativeUpcomingEpisodes(episodes, itemId, item.ParentIndexNumber || getVisibleSeasonNumber());
   }
 
   async function checkPage() {

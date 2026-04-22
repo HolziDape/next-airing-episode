@@ -118,6 +118,11 @@ Auswirkung:
   - Positionierung nach der Episodenliste bzw. im Detailbereich als Fallback
 - Serienansicht erweitert:
   - kommende Folgen werden jetzt auch auf der normalen Serienseite unterhalb des Episodenbereichs angezeigt
+- spaeterer Umbau fuer Web/Desktop:
+  - keine eigene Kartenreihe mehr
+  - stattdessen wird ein nativer sichtbarer Episodeintrag als Template geklont
+  - kommende Folgen werden direkt nach dem letzten sichtbaren nativen Eintrag eingefuegt
+  - bei nicht erkannter nativer Episodenliste wird nichts injiziert statt eine falsche Zusatz-UI zu rendern
 
 ### `manifest.json`
 
@@ -128,6 +133,7 @@ Auswirkung:
 
 - Assembly-Version auf `1.0.3.0` gesetzt
 - `ExcludeAssets=runtime` fuer `Jellyfin.Model` und `Jellyfin.Controller` gesetzt, damit keine unpassenden Runtime-Assets mitgezogen werden
+- aktueller lokaler Stand fuer den nativen Listen-Ansatz: `1.0.8.0`
 
 ### `README.md`
 
