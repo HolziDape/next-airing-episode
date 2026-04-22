@@ -79,8 +79,8 @@ README.md
 
 ## Current version
 
-- plugin assembly version: `1.0.11.0`
-- web script version: `1.0.11`
+- plugin assembly version: `1.0.12.0`
+- web script version: `1.0.12`
 
 ## Development notes
 
@@ -90,5 +90,47 @@ README.md
 - `1.0.9` fixes plugin assembly/file version metadata so Jellyfin no longer reports `0.0.0.0`
 - `1.0.10` prioritizes Jellyfin's actual children episode container on detail pages so cast/other card rows are not used as the template source
 - `1.0.11` targets the visible `#listChildrenCollapsible` / `#childrenContent` episode list directly and resolves item ids from descendant action/link nodes
+- `1.0.12` rewrites the known Jellyfin `listItem-largeImage` structure directly instead of relying on heuristic text-node matching
+
+## Current debug status
+
+- `v1.0.11` is published and available through the plugin repository
+- release/catalog/version problems are no longer the main blocker
+- the remaining problem is the actual Jellyfin DOM mapping on the affected series page
+- the browser dump from the real page showed:
+  - the visible season block lives under `#listChildrenCollapsible`
+  - the episode rows are `.listItem.listItem-largeImage`
+  - `#childrenCollapsible` can be present but hidden
+  - cast rows still exist in the same broader secondary layout and must not be used as the template source
+
+## Browser inspection snippet
+
+If another DOM check is needed on the affected Jellyfin page, use:
+
+```js
+(() => {
+  const el = document.querySelector('#listChildrenCollapsible .listItem.listItem-largeImage, #childrenContent .listItem.listItem-largeImage, .listItem.listItem-largeImage');
+  if (!el) {
+    console.log('NO_EPISODE_ITEM_FOUND');
+    return;
+  }
+
+  const chain = [];
+  let cur = el;
+  for (let i = 0; i < 6 && cur; i++) {
+    chain.push({
+      tag: cur.tagName,
+      id: cur.id || '',
+      class: cur.className || ''
+    });
+    cur = cur.parentElement;
+  }
+
+  console.log({
+    outerHTML: el.outerHTML.slice(0, 4000),
+    parentChain: chain
+  });
+})();
+```
 
 For project analysis, fixes, and troubleshooting, see [PLUGIN_DEBUG_NOTES.md](PLUGIN_DEBUG_NOTES.md).
