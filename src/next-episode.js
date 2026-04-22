@@ -4,7 +4,7 @@
  * Shows when the next unaired episode of a series will air,
  * directly on the series detail page in Jellyfin.
  *
- * @version     1.0.3
+ * @version     1.0.4
  * @author      HolziDape
  * @license     MIT
  * @repository  https://github.com/HolziDape/next-airing-episode
@@ -13,7 +13,7 @@
 (function () {
   'use strict';
 
-  const VERSION = '1.0.3';
+  const VERSION = '1.0.4';
   const BADGE_ID = 'next-airing-episode-badge';
   const SCRIPT_TAG = '[Next Airing Episode]';
   const LOCALE = 'de-DE';
