@@ -4,7 +4,7 @@
  * Shows when the next unaired episode of a series will air,
  * directly on the series detail page in Jellyfin.
  *
- * @version     1.0.10
+ * @version     1.0.11
  * @author      HolziDape
  * @license     MIT
  * @repository  https://github.com/HolziDape/next-airing-episode
@@ -13,7 +13,7 @@
 (function () {
   'use strict';
 
-  const VERSION = '1.0.10';
+  const VERSION = '1.0.11';
   const BADGE_ID = 'next-airing-episode-badge';
   const UPCOMING_ITEM_CLASS = 'next-airing-episode-upcoming-item';
   const UPCOMING_ITEM_ATTR = 'data-next-airing-episode';
@@ -363,6 +363,11 @@
       return parseItemIdFromHref(linkedNode.getAttribute('href'));
     }
 
+    const descendantWithId = node.querySelector('[data-id], [data-itemid], [data-item-id], a[href], .itemAction[data-id]');
+    if (descendantWithId) {
+      return getNodeItemId(descendantWithId);
+    }
+
     return null;
   }
 
@@ -372,10 +377,9 @@
 
   function getPreferredEpisodeContainers() {
     const selectors = [
-      '#childrenCollapsible .childrenItemsContainer .itemsContainer',
-      '#childrenContent .childrenItemsContainer .itemsContainer',
-      '#childrenCollapsible .itemsContainer',
-      '#childrenContent .itemsContainer',
+      '#listChildrenCollapsible #childrenContent',
+      '#listChildrenCollapsible .itemsContainer.padded-right',
+      '#childrenContent',
       '.childrenItemsContainer .itemsContainer',
     ];
 
@@ -386,11 +390,8 @@
 
   function getEpisodeNodeCandidates() {
     const itemSelectors = [
+      '.listItem.listItem-largeImage',
       '.listItem',
-      '.listItem-largeImage',
-      '.cardBox',
-      '.card',
-      '.itemAction',
     ];
 
     const preferredContainers = getPreferredEpisodeContainers();
@@ -399,18 +400,14 @@
     );
 
     const fallbackSelectors = [
+      '#listChildrenCollapsible .listItem.listItem-largeImage',
+      '#listChildrenCollapsible .listItem',
+      '#childrenContent .listItem.listItem-largeImage',
+      '#childrenContent .listItem',
+      '.childrenItemsContainer .listItem.listItem-largeImage',
       '.childrenItemsContainer .listItem',
-      '.childrenItemsContainer .listItem-largeImage',
-      '.childrenItemsContainer .cardBox',
-      '.childrenItemsContainer .card',
-      '.detailPageSecondaryContainer .listItem',
-      '.detailPageSecondaryContainer .listItem-largeImage',
-      '.detailPageSecondaryContainer .cardBox',
-      '.detailPageSecondaryContainer .card',
+      '.verticalSection .listItem.listItem-largeImage',
       '.verticalSection .listItem',
-      '.verticalSection .listItem-largeImage',
-      '.verticalSection .cardBox',
-      '.verticalSection .card',
     ];
 
     const fallbackNodes = fallbackSelectors.flatMap((selector) => Array.from(document.querySelectorAll(selector)));
@@ -419,7 +416,7 @@
 
   function getSectionRoot(node) {
     return node.closest(
-      '#childrenCollapsible, #childrenContent, .childrenItemsContainer, .verticalSection, .detailPageSecondaryContainer, section'
+      '#listChildrenCollapsible, #childrenContent, .itemsContainer, .childrenItemsContainer, .verticalSection, .detailPageSecondaryContainer, section'
     ) || node.parentElement;
   }
 
@@ -431,7 +428,10 @@
     if (section && (section.id === 'childrenCollapsible' || section.id === 'childrenContent')) {
       score += 5000;
     }
-    if (node.closest('#childrenCollapsible, #childrenContent')) {
+    if (section && section.id === 'listChildrenCollapsible') {
+      score += 7000;
+    }
+    if (node.closest('#listChildrenCollapsible, #childrenContent')) {
       score += 3000;
     }
     if (node.classList.contains('listItem-largeImage')) {

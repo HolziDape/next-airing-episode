@@ -142,6 +142,10 @@ Auswirkung:
   - `#childrenCollapsible` / `#childrenContent` werden als primaere Quelle fuer Episodenlisten priorisiert
   - sichtbare Cast-/People-Reihen werden bei der Template-Wahl stark abgewertet
   - `listItem-largeImage` und echte Children-Bereiche werden hoeher gewichtet als allgemeine Kartencontainer
+- nach echter DOM-Ausgabe aus dem Browser weiter verschaerft:
+  - sichtbarer Bereich `#listChildrenCollapsible` / `#childrenContent` wird direkt bevorzugt
+  - nur `listItem` / `listItem-largeImage` werden als eigentliche Episodenkandidaten betrachtet
+  - Item-Ids koennen jetzt auch aus verschachtelten Action-/Link-Elementen gelesen werden
 
 ### `README.md`
 
