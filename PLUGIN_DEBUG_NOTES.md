@@ -146,6 +146,12 @@ Auswirkung:
   - sichtbarer Bereich `#listChildrenCollapsible` / `#childrenContent` wird direkt bevorzugt
   - nur `listItem` / `listItem-largeImage` werden als eigentliche Episodenkandidaten betrachtet
   - Item-Ids koennen jetzt auch aus verschachtelten Action-/Link-Elementen gelesen werden
+- nach `outerHTML` einer echten Episodenzeile weiter konkretisiert:
+  - Titel sitzt in `.listItemBody .listItemBodyText bdi`
+  - Metainfo sitzt in `.secondary.listItemMediaInfo`
+  - Overview sitzt in `.secondary.listItem-overview bdi` und `.listItem-bottomoverview bdi`
+  - Bild ist kein `img`, sondern `background-image` auf `.listItemImage.listItemImage-large`
+  - daraus folgte ein direkter Rewrite der bekannten `listItem-largeImage`-Struktur statt heuristischer Textsuche
 
 ### `README.md`
 
@@ -353,6 +359,71 @@ Damit ist die Richtung jetzt naeher an:
 Und weiter weg von:
 
 - "separate Vorschau-Sektion"
+
+## Reale DOM-Erkenntnisse aus der betroffenen Jellyfin-Seite
+
+Der wichtigste Fortschritt kam erst durch einen echten Browser-Dump aus der betroffenen Serienseite.
+
+Wesentliche Beobachtungen:
+
+- `#childrenCollapsible` ist vorhanden, aber in diesem Fall `hide`
+- der sichtbare Staffelbereich sitzt stattdessen unter `#listChildrenCollapsible`
+- `#childrenContent` enthaelt die sichtbare Staffel-/Episodenansicht
+- die echten Episodenzeilen sind `listItem listItem-largeImage listItem-withContentWrapper`
+- sichtbare Folgen 1 bis 4 wurden korrekt als `listItem-largeImage` gefunden
+- Cast-/People-Bereiche leben parallel in derselben groesseren Detailseite, duerfen aber nicht als Vorlage fuer kommende Folgen verwendet werden
+
+Konkrete Auszuege aus dem Dump:
+
+- `#childrenContent` enthielt sichtbare Texte wie `Staffel 1` und danach die echte Episodenliste
+- `.listItem` und `.listItem-largeImage` lieferten genau die vier sichtbaren Episoden
+- `.cardBox` enthielt sowohl Staffel- als auch Cast-/Crew-Karten und ist deshalb als allgemeiner Episoden-Fallback zu ungenau
+- `.detailPageSecondaryContainer` enthielt Mischinhalt aus zusaetzlichen Bereichen und Cast, also ebenfalls zu breit als Zielbereich
+
+Schlussfolgerung:
+
+- die Injektion muss zuerst gegen `#listChildrenCollapsible` / `#childrenContent` arbeiten
+- die Kandidaten fuer native Episoden muessen auf `listItem` / `listItem-largeImage` begrenzt werden
+- Item-Ids duerfen nicht nur am Root-Knoten gesucht werden, sondern auch in verschachtelten Action-/Link-Elementen
+
+## Aktueller dokumentierter Stand nach v1.0.11
+
+- `v1.0.11` ist veroefentlicht
+- Release, Tag, Asset und Manifest sind vorhanden
+- wenn das Verhalten weiterhin falsch ist, liegt der Restfehler nicht mehr an Version/Katalog/Checksum
+- der Restfehler ist dann rein DOM-/Template-bezogen
+
+## Naechster Browser-Dump bei weiterem Fehlverhalten
+
+Wenn die Darstellung nach `v1.0.11` weiterhin falsch ist, dann ist der naechste notwendige Schritt ein Dump der echten ersten nativen Episodenzeile inklusive Parent-Kette.
+
+Verwendetes Snippet:
+
+```js
+(() => {
+  const el = document.querySelector('#listChildrenCollapsible .listItem.listItem-largeImage, #childrenContent .listItem.listItem-largeImage, .listItem.listItem-largeImage');
+  if (!el) {
+    console.log('NO_EPISODE_ITEM_FOUND');
+    return;
+  }
+
+  const chain = [];
+  let cur = el;
+  for (let i = 0; i < 6 && cur; i++) {
+    chain.push({
+      tag: cur.tagName,
+      id: cur.id || '',
+      class: cur.className || ''
+    });
+    cur = cur.parentElement;
+  }
+
+  console.log({
+    outerHTML: el.outerHTML.slice(0, 4000),
+    parentChain: chain
+  });
+})();
+```
 
 ## Schnellcheck bei Problemen
 

@@ -4,7 +4,7 @@
  * Shows when the next unaired episode of a series will air,
  * directly on the series detail page in Jellyfin.
  *
- * @version     1.0.11
+ * @version     1.0.12
  * @author      HolziDape
  * @license     MIT
  * @repository  https://github.com/HolziDape/next-airing-episode
@@ -13,7 +13,7 @@
 (function () {
   'use strict';
 
-  const VERSION = '1.0.11';
+  const VERSION = '1.0.12';
   const BADGE_ID = 'next-airing-episode-badge';
   const UPCOMING_ITEM_CLASS = 'next-airing-episode-upcoming-item';
   const UPCOMING_ITEM_ATTR = 'data-next-airing-episode';
@@ -539,116 +539,6 @@
     };
   }
 
-  function getLeafTextElements(root) {
-    return Array.from(root.querySelectorAll('*')).filter((element) => {
-      if (!element.childElementCount) {
-        return normalizeText(element.textContent).length > 0;
-      }
-
-      return false;
-    });
-  }
-
-  function findBestLeaf(elements, scoreFn) {
-    let bestElement = null;
-    let bestScore = -1;
-
-    for (const element of elements) {
-      const score = scoreFn(element);
-      if (score > bestScore) {
-        bestScore = score;
-        bestElement = element;
-      }
-    }
-
-    return bestElement;
-  }
-
-  function getOverviewSnippet(text) {
-    return normalizeText(String(text || '').slice(0, 80));
-  }
-
-  function findTitleElement(root, sourceEpisode) {
-    const leaves = getLeafTextElements(root);
-    const sourceName = normalizeText(sourceEpisode.Name);
-    const sourceCode = normalizeText(createEpisodeCode(sourceEpisode));
-    const sourceLabel = normalizeText(createLabel(sourceEpisode));
-    const sourceDisplayTitle = normalizeText(createDisplayTitle(sourceEpisode));
-    const sourceIndexPrefix = sourceEpisode.IndexNumber != null
-      ? normalizeText(`${sourceEpisode.IndexNumber}.`)
-      : '';
-
-    return findBestLeaf(leaves, (element) => {
-      const text = normalizeText(element.textContent);
-      if (!text) {
-        return -1;
-      }
-
-      let score = text.length;
-      if (sourceName && text.includes(sourceName)) {
-        score += 2000;
-      }
-      if (sourceDisplayTitle && text === sourceDisplayTitle) {
-        score += 1800;
-      }
-      if (sourceLabel && text.includes(sourceLabel)) {
-        score += 1500;
-      }
-      if (sourceCode && text.includes(sourceCode)) {
-        score += 1200;
-      }
-      if (sourceIndexPrefix && text.startsWith(sourceIndexPrefix)) {
-        score += 900;
-      }
-
-      return score;
-    });
-  }
-
-  function findOverviewElement(root, sourceEpisode, titleElement) {
-    const leaves = getLeafTextElements(root).filter((element) => element !== titleElement);
-    const overviewSnippet = getOverviewSnippet(sourceEpisode.Overview);
-    if (!overviewSnippet) {
-      return null;
-    }
-
-    return findBestLeaf(leaves, (element) => {
-      const text = normalizeText(element.textContent);
-      if (!text) {
-        return -1;
-      }
-
-      let score = 0;
-      if (text.includes(overviewSnippet)) {
-        score += 2000;
-      }
-
-      score += Math.min(text.length, 200);
-      return score;
-    });
-  }
-
-  function findInfoElement(root, titleElement, overviewElement) {
-    const leaves = getLeafTextElements(root).filter((element) => element !== titleElement && element !== overviewElement);
-    return findBestLeaf(leaves, (element) => {
-      const text = normalizeText(element.textContent);
-      if (!text) {
-        return -1;
-      }
-
-      const textLength = text.length;
-      let score = 100 - Math.min(Math.abs(textLength - 22), 100);
-      if (/\d/.test(text)) {
-        score += 25;
-      }
-      if (/end|endet|min|m$|heute|morgen|tage|uhr/.test(text)) {
-        score += 50;
-      }
-
-      return score;
-    });
-  }
-
   function replaceTextContent(element, value) {
     if (element) {
       element.textContent = value;
@@ -721,6 +611,20 @@
 
   function updateImage(root, episode) {
     const imageUrl = getImageUrl(episode);
+    const backgroundNode = root.querySelector('.listItemImage.listItemImage-large');
+    if (backgroundNode) {
+      if (imageUrl) {
+        backgroundNode.style.backgroundImage = `url("${imageUrl}")`;
+        backgroundNode.classList.add('lazy-image-fadein-fast');
+      } else {
+        backgroundNode.style.backgroundImage = 'none';
+      }
+
+      updateNodeItemIds(backgroundNode, episode.Id);
+      backgroundNode.setAttribute('data-action', 'link');
+      return;
+    }
+
     const images = root.matches('img') ? [root] : Array.from(root.querySelectorAll('img'));
     if (!images.length) {
       return;
@@ -741,34 +645,58 @@
     }
   }
 
-  function updateText(root, sourceEpisode, targetEpisode) {
-    const titleElement = findTitleElement(root, sourceEpisode);
-    const overviewElement = findOverviewElement(root, sourceEpisode, titleElement);
-    let infoElement = findInfoElement(root, titleElement, overviewElement);
+  function updateExplicitListItemLayout(root, episode) {
+    const titleBdi = root.querySelector('.listItemBody .listItemBodyText bdi');
+    const mediaInfo = root.querySelector('.listItemMediaInfo');
+    const overviewBdi = root.querySelector('.listItem-overview bdi');
+    const bottomOverviewBdi = root.querySelector('.listItem-bottomoverview bdi');
+    const bodyAction = root.querySelector('.listItemBody.itemAction');
 
-    replaceTextContent(titleElement, createDisplayTitle(targetEpisode));
+    replaceTextContent(titleBdi, createDisplayTitle(episode));
 
-    if (!infoElement && titleElement && titleElement.parentElement) {
-      infoElement = titleElement.cloneNode(false);
-      infoElement.className = titleElement.className;
-      infoElement.removeAttribute('style');
-      titleElement.insertAdjacentElement('afterend', infoElement);
+    if (mediaInfo) {
+      mediaInfo.innerHTML = '';
+
+      const runtimeNode = document.createElement('div');
+      runtimeNode.className = 'mediaInfoItem';
+      runtimeNode.textContent = episode.RunTimeTicks ? `${Math.round(episode.RunTimeTicks / 600000000)}m` : 'TBA';
+      mediaInfo.appendChild(runtimeNode);
+
+      const dateNode = document.createElement('div');
+      dateNode.className = 'mediaInfoItem endsAt';
+      dateNode.textContent = formatRelative(episode.PremiereDate);
+      mediaInfo.appendChild(dateNode);
     }
 
-    replaceTextContent(infoElement, formatRelative(targetEpisode.PremiereDate));
-
-    if (targetEpisode.Overview) {
-      if (overviewElement) {
-        replaceTextContent(overviewElement, targetEpisode.Overview);
-      } else if (infoElement && infoElement.parentElement) {
-        const detailElement = infoElement.cloneNode(false);
-        detailElement.className = infoElement.className;
-        detailElement.removeAttribute('style');
-        detailElement.textContent = targetEpisode.Overview;
-        infoElement.insertAdjacentElement('afterend', detailElement);
-      }
+    if (targetEpisodeHasOverview(episode)) {
+      replaceTextContent(overviewBdi, episode.Overview);
+      replaceTextContent(bottomOverviewBdi, episode.Overview);
     } else {
-      hideElement(overviewElement);
+      hideElement(root.querySelector('.listItem-overview'));
+      hideElement(root.querySelector('.listItem-bottomoverview'));
+    }
+
+    if (bodyAction) {
+      updateNodeItemIds(bodyAction, episode.Id);
+      bodyAction.setAttribute('data-action', 'link');
+    }
+  }
+
+  function targetEpisodeHasOverview(episode) {
+    return Boolean(episode && normalizeText(episode.Overview));
+  }
+
+  function updateText(root, sourceEpisode, targetEpisode) {
+    if (root.classList.contains('listItem-largeImage')) {
+      updateExplicitListItemLayout(root, targetEpisode);
+      return;
+    }
+
+    const textBlocks = Array.from(root.querySelectorAll('.listItemBodyText bdi'));
+    replaceTextContent(textBlocks[0], createDisplayTitle(targetEpisode));
+    replaceTextContent(textBlocks[1], formatRelative(targetEpisode.PremiereDate));
+    if (targetEpisodeHasOverview(targetEpisode)) {
+      replaceTextContent(textBlocks[2], targetEpisode.Overview);
     }
   }
 
