@@ -13,7 +13,7 @@
 (function () {
   'use strict';
 
-  const VERSION = '1.0.12';
+  const VERSION = '1.0.13';
   const BADGE_ID = 'next-airing-episode-badge';
   const UPCOMING_ITEM_CLASS = 'next-airing-episode-upcoming-item';
   const UPCOMING_ITEM_ATTR = 'data-next-airing-episode';
@@ -244,7 +244,24 @@
   function getItemIdFromUrl() {
     try {
       const url = new URL(location.href);
-      return url.searchParams.get('id');
+      let id = url.searchParams.get('id');
+      if (id) {
+        return id;
+      }
+
+      // Check hash for SPA navigation (e.g. #!/details?id=...)
+      if (url.hash) {
+        const hashPart = url.hash.replace(/^#+!?/, '');
+        const searchPart = hashPart.includes('?') ? hashPart.substring(hashPart.indexOf('?')) : (hashPart.startsWith('?') ? hashPart : '');
+        if (searchPart) {
+          const hashParams = new URLSearchParams(searchPart);
+          const hashId = hashParams.get('id');
+          if (hashId) {
+            return hashId;
+          }
+        }
+      }
+      return null;
     } catch {
       return null;
     }
@@ -264,19 +281,26 @@
     }
   }
 
-  function getImageUrl(item) {
+  function getImageUrl(item, seriesItem) {
     const serverAddress = getServerAddress();
     const token = getToken();
     if (!serverAddress || !token || !item) {
       return null;
     }
 
+    // 1. Episode primary image
     if (item.ImageTags && item.ImageTags.Primary) {
       return `${serverAddress}/Items/${encodeURIComponent(item.Id)}/Images/Primary?maxWidth=520&quality=90&tag=${encodeURIComponent(item.ImageTags.Primary)}&api_key=${encodeURIComponent(token)}`;
     }
 
+    // 2. Season thumb
     if (item.ParentThumbItemId && item.ParentThumbImageTag) {
       return `${serverAddress}/Items/${encodeURIComponent(item.ParentThumbItemId)}/Images/Thumb?maxWidth=520&quality=90&tag=${encodeURIComponent(item.ParentThumbImageTag)}&api_key=${encodeURIComponent(token)}`;
+    }
+
+    // 3. Series primary image (Fallback)
+    if (seriesItem && seriesItem.ImageTags && seriesItem.ImageTags.Primary) {
+      return `${serverAddress}/Items/${encodeURIComponent(seriesItem.Id)}/Images/Primary?maxWidth=520&quality=90&tag=${encodeURIComponent(seriesItem.ImageTags.Primary)}&api_key=${encodeURIComponent(token)}`;
     }
 
     return null;
@@ -609,8 +633,8 @@
     }
   }
 
-  function updateImage(root, episode) {
-    const imageUrl = getImageUrl(episode);
+  function updateImage(root, episode, seriesItem) {
+    const imageUrl = getImageUrl(episode, seriesItem);
     const backgroundNode = root.querySelector('.listItemImage.listItemImage-large');
     if (backgroundNode) {
       if (imageUrl) {
@@ -700,17 +724,17 @@
     }
   }
 
-  function buildUpcomingEpisodeNode(context, episode) {
+  function buildUpcomingEpisodeNode(context, episode, seriesItem) {
     const clone = context.templateNode.cloneNode(true);
     sanitizeClone(clone);
     updateNodeItemIds(clone, episode.Id);
     updateLinks(clone, episode);
-    updateImage(clone, episode);
+    updateImage(clone, episode, seriesItem);
     updateText(clone, context.templateEpisode, episode);
     return clone;
   }
 
-  function injectUpcomingEpisodes(episodes, context) {
+  function injectUpcomingEpisodes(episodes, context, seriesItem) {
     removeUpcomingSection();
     if (!episodes.length || !context) {
       return;
@@ -718,7 +742,7 @@
 
     let insertAfter = context.insertAfter;
     for (const episode of episodes) {
-      const clone = buildUpcomingEpisodeNode(context, episode);
+      const clone = buildUpcomingEpisodeNode(context, episode, seriesItem);
       insertAfter.insertAdjacentElement('afterend', clone);
       insertAfter = clone;
     }
@@ -733,7 +757,7 @@
       .filter((episode) => seasonNumber == null || Number(episode.ParentIndexNumber) === Number(seasonNumber));
   }
 
-  function renderNativeUpcomingEpisodes(episodes, currentEpisodeId, preferredSeasonNumber) {
+  function renderNativeUpcomingEpisodes(episodes, currentEpisodeId, preferredSeasonNumber, seriesItem) {
     const context = findNativeEpisodeContext(episodes, preferredSeasonNumber);
     if (!context) {
       removeUpcomingSection();
@@ -745,7 +769,11 @@
     const upcomingEpisodes = getUpcomingEpisodes(episodes, currentEpisodeId, context.seasonNumber)
       .filter((episode) => !visibleIds.has(episode.Id));
 
-    injectUpcomingEpisodes(upcomingEpisodes, context);
+    if (upcomingEpisodes.length > 0) {
+      console.info(`${SCRIPT_TAG} injecting ${upcomingEpisodes.length} upcoming episodes`);
+    }
+
+    injectUpcomingEpisodes(upcomingEpisodes, context, seriesItem);
 
     return {
       nextVisibleUpcoming: upcomingEpisodes[0] || null,
@@ -753,14 +781,14 @@
     };
   }
 
-  async function renderSeriesPage(itemId, runId) {
-    const episodes = await fetchSeriesEpisodes(itemId);
+  async function renderSeriesPage(seriesItem, runId) {
+    const episodes = await fetchSeriesEpisodes(seriesItem.Id);
     if (runId !== currentRun) {
       return;
     }
 
     const preferredSeasonNumber = getVisibleSeasonNumber();
-    const { nextVisibleUpcoming } = renderNativeUpcomingEpisodes(episodes, null, preferredSeasonNumber);
+    const { nextVisibleUpcoming } = renderNativeUpcomingEpisodes(episodes, null, preferredSeasonNumber, seriesItem);
     const nextEpisode = nextVisibleUpcoming || getUpcomingEpisodes(episodes, null, null)[0] || null;
 
     if (nextEpisode) {
@@ -770,25 +798,24 @@
     }
   }
 
-  async function renderEpisodePage(itemId, runId) {
+  async function renderEpisodePage(episodeItem, runId) {
     removeBadge();
 
-    const item = await getItem(itemId);
-    if (runId !== currentRun) {
-      return;
-    }
-
-    if (!item || !item.SeriesId) {
+    if (!episodeItem || !episodeItem.SeriesId) {
       removeUpcomingSection();
       return;
     }
 
-    const episodes = await fetchSeriesEpisodes(item.SeriesId);
+    const [episodes, seriesItem] = await Promise.all([
+      fetchSeriesEpisodes(episodeItem.SeriesId),
+      getItem(episodeItem.SeriesId),
+    ]);
+
     if (runId !== currentRun) {
       return;
     }
 
-    renderNativeUpcomingEpisodes(episodes, itemId, item.ParentIndexNumber || getVisibleSeasonNumber());
+    renderNativeUpcomingEpisodes(episodes, episodeItem.Id, episodeItem.ParentIndexNumber || getVisibleSeasonNumber(), seriesItem);
   }
 
   async function checkPage() {
@@ -815,12 +842,12 @@
     }
 
     if (item.Type === 'Series') {
-      await renderSeriesPage(itemId, runId);
+      await renderSeriesPage(item, runId);
       return;
     }
 
     if (item.Type === 'Episode') {
-      await renderEpisodePage(itemId, runId);
+      await renderEpisodePage(item, runId);
       return;
     }
 
