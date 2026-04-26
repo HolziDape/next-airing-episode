@@ -13,7 +13,7 @@
 (function () {
   'use strict';
 
-  const VERSION = '1.0.17';
+  const VERSION = '1.0.18';
   const BADGE_ID = 'next-airing-episode-badge';
   const UPCOMING_ITEM_CLASS = 'next-airing-episode-upcoming-item';
   const UPCOMING_ITEM_ATTR = 'data-next-airing-episode';
@@ -401,9 +401,9 @@
   }
 
   function getPreferredEpisodeContainers() {
-    const selectors = [
       '#listChildrenCollapsible #childrenContent',
-      '#listChildrenCollapsible .itemsContainer.padded-right',
+      '#listChildrenCollapsible .itemsContainer',
+      '#childrenContent .itemsContainer',
       '#childrenContent',
       '.childrenItemsContainer .itemsContainer',
     ];
