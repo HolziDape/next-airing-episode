@@ -13,7 +13,7 @@
 (function () {
   'use strict';
 
-  const VERSION = '1.0.15';
+  const VERSION = '1.0.16';
   const BADGE_ID = 'next-airing-episode-badge';
   const UPCOMING_ITEM_CLASS = 'next-airing-episode-upcoming-item';
   const UPCOMING_ITEM_ATTR = 'data-next-airing-episode';
@@ -789,12 +789,14 @@
 
     const preferredSeasonNumber = getVisibleSeasonNumber();
     const { nextVisibleUpcoming } = renderNativeUpcomingEpisodes(episodes, null, preferredSeasonNumber, seriesItem);
-    const nextEpisode = nextVisibleUpcoming || getUpcomingEpisodes(episodes, null, null)[0] || null;
+    const upcomingEpisodes = getUpcomingEpisodes(episodes, null, null);
+    const nextEpisode = nextVisibleUpcoming || upcomingEpisodes[0] || null;
 
     if (nextEpisode) {
-      console.info(`${SCRIPT_TAG} rendering badge for next episode: ${nextEpisode.Name || nextEpisode.Id}`);
+      console.info(`${SCRIPT_TAG} rendering badge for next episode: ${nextEpisode.Name || nextEpisode.Id} (Premiere: ${nextEpisode.PremiereDate})`);
       injectBadge(nextEpisode);
     } else {
+      console.info(`${SCRIPT_TAG} no upcoming episodes found in the future (Total episodes checked: ${episodes.length})`);
       removeBadge();
     }
   }
