@@ -13,7 +13,7 @@
 (function () {
   'use strict';
 
-  const VERSION = '1.0.13';
+  const VERSION = '1.0.14';
   const BADGE_ID = 'next-airing-episode-badge';
   const UPCOMING_ITEM_CLASS = 'next-airing-episode-upcoming-item';
   const UPCOMING_ITEM_ATTR = 'data-next-airing-episode';
@@ -227,6 +227,7 @@
       '.overview-container',
       '.overview',
       '.detailPageContent h3',
+      '.itemDetailPageContent h3',
       '.nameContainer',
     ];
 
@@ -238,7 +239,7 @@
       }
     }
 
-    (document.querySelector('.detailPageContent') || document.querySelector('main'))?.prepend(badge);
+    (document.querySelector('.itemDetailPageContent') || document.querySelector('.detailPageContent') || document.querySelector('main'))?.prepend(badge);
   }
 
   function getItemIdFromUrl() {
@@ -440,7 +441,7 @@
 
   function getSectionRoot(node) {
     return node.closest(
-      '#listChildrenCollapsible, #childrenContent, .itemsContainer, .childrenItemsContainer, .verticalSection, .detailPageSecondaryContainer, section'
+      '#listChildrenCollapsible, #childrenContent, .itemsContainer, .childrenItemsContainer, .verticalSection, .itemDetailPageSecondaryContainer, .detailPageSecondaryContainer, section'
     ) || node.parentElement;
   }
 
