@@ -12,7 +12,7 @@
         "changelog": "Fixes syntax errors in getSectionRoot and ensures compatibility with Jellyfin 10.11+ episode lists.",
         "targetAbi": "10.10.0.0",
         "sourceUrl": "https://github.com/HolziDape/next-airing-episode/releases/download/v1.0.19/Jellyfin.Plugin.NextAiringEpisode_1.0.19.0.zip",
-        "checksum": "45a9965c21bdcd5b4330e1d9d82853d2",
+        "checksum": "004cd31638dce13118b6044e24f012fa",
         "timestamp": "2026-04-22T00:00:00Z"
       }
     ]
