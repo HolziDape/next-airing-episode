@@ -8,10 +8,10 @@
     "category": "UI Enhancement",
     "versions": [
       {
-        "version": "1.0.14.0",
-        "changelog": "Fixes CSS selectors for Jellyfin 10.11+ compatibility and improves badge injection stability.",
+        "version": "1.0.15.0",
+        "changelog": "Improves badge visibility on series pages and adds diagnostic logging.",
         "targetAbi": "10.10.0.0",
-        "sourceUrl": "https://github.com/HolziDape/next-airing-episode/releases/download/v1.0.14/Jellyfin.Plugin.NextAiringEpisode_1.0.14.0.zip",
+        "sourceUrl": "https://github.com/HolziDape/next-airing-episode/releases/download/v1.0.15/Jellyfin.Plugin.NextAiringEpisode_1.0.15.0.zip",
         "checksum": "2328677e2333f138c68f1c978ed16212",
         "timestamp": "2026-04-22T00:00:00Z"
       }
